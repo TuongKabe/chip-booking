@@ -1,0 +1,236 @@
+<script>
+  const state = {
+    selectedService: null,
+    selectedSlot: null,
+    services: [],
+    slots: [],
+    booking: null,
+    config: null,
+    timerId: null
+  };
+
+  function setStatus(msg) {
+    document.getElementById('status-text').textContent = msg || '';
+  }
+
+  function asCurrencyVnd(value) {
+    const n = Number(value || 0);
+    return new Intl.NumberFormat('vi-VN').format(n) + ' VND';
+  }
+
+  function renderServices() {
+    const wrap = document.getElementById('service-list');
+    wrap.innerHTML = '';
+
+    state.services.forEach((s) => {
+      const el = document.createElement('article');
+      el.className = 'item' + (state.selectedService?.comboId === s.comboId ? ' selected' : '');
+      el.innerHTML = `
+        <strong>${s.name}</strong>
+        <p class="muted">${s.category || ''}</p>
+        <p>${asCurrencyVnd(s.priceVnd)}${s.priceUsd ? ` (~${s.priceUsd} USD)` : ''}</p>
+        <p class="muted">${(s.details || '').replace(/\n/g, '<br>')}</p>
+      `;
+      el.onclick = () => {
+        state.selectedService = s;
+        renderServices();
+      };
+      wrap.appendChild(el);
+    });
+  }
+
+  function renderSlots() {
+    const wrap = document.getElementById('slot-list');
+    wrap.innerHTML = '';
+
+    state.slots.forEach((s) => {
+      const el = document.createElement('article');
+      el.className = 'item' + (state.selectedSlot?.slotKey === s.slotKey ? ' selected' : '');
+      el.innerHTML = `<strong>${s.date}</strong><p>${s.start} - ${s.end}</p>`;
+      el.onclick = () => {
+        state.selectedSlot = s;
+        renderSlots();
+      };
+      wrap.appendChild(el);
+    });
+
+    if (!state.slots.length) {
+      wrap.innerHTML = '<p class="muted">Hiện chưa có khung giờ trống.</p>';
+    }
+  }
+
+  function loadInitialData() {
+    setStatus('Đang tải dữ liệu...');
+
+    google.script.run.withSuccessHandler((cfg) => {
+      state.config = cfg;
+      document.getElementById('qr-image').src = cfg.bank.qrImageUrl;
+      document.getElementById('bank-name').textContent = cfg.bank.bankName;
+      document.getElementById('bank-number').textContent = cfg.bank.accountNumber;
+      document.getElementById('bank-owner').textContent = cfg.bank.accountName;
+    }).getPublicConfig();
+
+    google.script.run.withSuccessHandler((services) => {
+      state.services = services;
+      renderServices();
+      setStatus('');
+    }).withFailureHandler((err) => {
+      setStatus('Không tải được dịch vụ: ' + err.message);
+    }).getServices();
+
+    google.script.run.withSuccessHandler((slots) => {
+      state.slots = slots;
+      renderSlots();
+    }).withFailureHandler((err) => {
+      setStatus('Không tải được khung giờ: ' + err.message);
+    }).getAvailableSlots();
+  }
+
+  function startCountdown(deadlineIso) {
+    if (state.timerId) clearInterval(state.timerId);
+
+    const deadline = new Date(deadlineIso);
+    const node = document.getElementById('countdown');
+
+    const tick = () => {
+      const diff = deadline.getTime() - Date.now();
+      if (diff <= 0) {
+        node.textContent = '00:00';
+        clearInterval(state.timerId);
+        setStatus('Đã hết hạn thanh toán. Hệ thống sẽ huỷ đơn nếu chưa xác nhận.');
+        return;
+      }
+      const min = Math.floor(diff / 60000);
+      const sec = Math.floor((diff % 60000) / 1000);
+      node.textContent = String(min).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+    };
+
+    tick();
+    state.timerId = setInterval(tick, 1000);
+  }
+
+  async function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const full = reader.result;
+        const base64 = full.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function validateBillFile(file) {
+    if (!state.config || !state.config.upload) {
+      return 'Hệ thống chưa tải xong cấu hình upload. Vui lòng thử lại.';
+    }
+
+    const allowed = (state.config.upload.allowedBillMimeTypes || []).map(v => String(v).toLowerCase());
+    const maxMb = Number(state.config.upload.maxBillSizeMb || 0);
+    const mime = String(file.type || '').toLowerCase();
+
+    if (!mime || !allowed.includes(mime)) {
+      return 'Định dạng ảnh không hợp lệ. Cho phép: ' + allowed.join(', ');
+    }
+
+    if (maxMb > 0) {
+      const maxBytes = maxMb * 1024 * 1024;
+      if (file.size > maxBytes) {
+        return `File quá lớn. Giới hạn ${maxMb}MB.`;
+      }
+    }
+
+    return '';
+  }
+
+  document.getElementById('booking-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    if (!state.selectedService) {
+      setStatus('Bạn chưa chọn combo.');
+      return;
+    }
+    if (!state.selectedSlot) {
+      setStatus('Bạn chưa chọn khung giờ.');
+      return;
+    }
+
+    const form = new FormData(e.currentTarget);
+    const payload = {
+      fullName: form.get('fullName'),
+      phone: form.get('phone'),
+      email: form.get('email'),
+      dob: form.get('dob'),
+      issueSummary: form.get('issueSummary'),
+      comboId: state.selectedService.comboId,
+      slotKey: state.selectedSlot.slotKey
+    };
+
+    setStatus('Đang tạo booking...');
+
+    google.script.run
+      .withSuccessHandler((res) => {
+        state.booking = res;
+        document.getElementById('step-payment').classList.remove('hidden');
+        document.getElementById('booking-summary').innerHTML = `
+          <p><strong>Mã booking:</strong> ${res.bookingCode}</p>
+          <p><strong>Combo:</strong> ${res.comboName}</p>
+          <p><strong>Lịch:</strong> ${res.slot.date} ${res.slot.start} - ${res.slot.end}</p>
+        `;
+        document.getElementById('transfer-note').textContent = `${res.bookingCode} ${payload.phone}`;
+        startCountdown(res.paymentDeadlineIso);
+        setStatus('Đã tạo đơn pending. Vui lòng thanh toán và upload biên lai.');
+
+        google.script.run.withSuccessHandler((slots) => {
+          state.slots = slots;
+          renderSlots();
+        }).getAvailableSlots();
+      })
+      .withFailureHandler((err) => {
+        setStatus('Tạo booking thất bại: ' + err.message);
+      })
+      .createPendingBooking(payload);
+  });
+
+  document.getElementById('upload-btn').addEventListener('click', async () => {
+    if (!state.booking) {
+      setStatus('Bạn chưa tạo booking.');
+      return;
+    }
+
+    const fileInput = document.getElementById('bill-file');
+    const file = fileInput.files[0];
+    if (!file) {
+      setStatus('Vui lòng chọn ảnh biên lai.');
+      return;
+    }
+
+    const fileError = validateBillFile(file);
+    if (fileError) {
+      setStatus(fileError);
+      return;
+    }
+
+    setStatus('Đang tải biên lai...');
+
+    const base64 = await fileToBase64(file);
+    google.script.run
+      .withSuccessHandler((res) => {
+        document.getElementById('upload-result').textContent = 'Đã tải biên lai: ' + res.fileUrl;
+        setStatus('Tải biên lai thành công. Reader sẽ xác nhận thu tiền thủ công.');
+      })
+      .withFailureHandler((err) => {
+        setStatus('Upload thất bại: ' + err.message);
+      })
+      .uploadBillImage({
+        bookingCode: state.booking.bookingCode,
+        fileName: file.name,
+        mimeType: file.type,
+        base64
+      });
+  });
+
+  loadInitialData();
+</script>

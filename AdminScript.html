@@ -1,0 +1,229 @@
+<script>
+  const adminState = {
+    snapshot: null,
+    token: sessionStorage.getItem('tarot_admin_token') || ''
+  };
+
+  function setAdminStatus(msg) {
+    document.getElementById('admin-status').textContent = msg || '';
+  }
+
+  function esc(text) {
+    return String(text || '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function showDashboard(isLoggedIn) {
+    document.getElementById('login-card').classList.toggle('hidden', isLoggedIn);
+    document.getElementById('dashboard').classList.toggle('hidden', !isLoggedIn);
+  }
+
+  function withAdminToken(payload) {
+    return Object.assign({}, payload || {}, { adminToken: adminState.token });
+  }
+
+  function buildRescheduleOptions(currentSlotKey) {
+    const slots = adminState.snapshot.slots || [];
+    return slots
+      .filter(s => s.status === adminState.snapshot.status.SLOT_EMPTY && s.slotKey !== currentSlotKey)
+      .map(s => `<option value="${esc(s.slotKey)}">${esc(s.date)} ${esc(s.start)}-${esc(s.end)}</option>`)
+      .join('');
+  }
+
+  function renderBookings() {
+    const tbody = document.getElementById('booking-table');
+    const rows = adminState.snapshot.bookings || [];
+
+    tbody.innerHTML = rows.map((b) => {
+      const rescheduleOptions = buildRescheduleOptions(b.slotKey);
+      const allowConfirm = b.status === adminState.snapshot.status.BOOKING_PENDING;
+      const allowCancel = [
+        adminState.snapshot.status.BOOKING_PENDING,
+        adminState.snapshot.status.BOOKING_CONFIRMED,
+        adminState.snapshot.status.BOOKING_RESCHEDULED
+      ].includes(b.status);
+      const allowReschedule = [
+        adminState.snapshot.status.BOOKING_PENDING,
+        adminState.snapshot.status.BOOKING_CONFIRMED,
+        adminState.snapshot.status.BOOKING_RESCHEDULED
+      ].includes(b.status);
+
+      return `
+        <tr>
+          <td>${esc(b.bookingCode)}</td>
+          <td>
+            <strong>${esc(b.fullName)}</strong><br>
+            <span class="muted">${esc(b.phone)}<br>${esc(b.email)}</span>
+          </td>
+          <td>${esc(b.comboName)}</td>
+          <td>${esc(b.date)}<br>${esc(b.start)}-${esc(b.end)}</td>
+          <td>${esc(b.status)}</td>
+          <td>${b.billUrl ? `<a href="${esc(b.billUrl)}" target="_blank">Xem bill</a>` : '<span class="muted">Chưa có</span>'}</td>
+          <td>
+            <div class="inline">
+              <button class="mini" ${allowConfirm ? '' : 'disabled'} onclick="changeStatus('${esc(b.bookingCode)}','${esc(adminState.snapshot.status.BOOKING_CONFIRMED)}')">Confirm</button>
+              <button class="mini" ${allowCancel ? '' : 'disabled'} onclick="changeStatus('${esc(b.bookingCode)}','${esc(adminState.snapshot.status.BOOKING_CANCELLED)}')">Cancel</button>
+            </div>
+            <div class="inline" style="margin-top:6px;">
+              <select id="rs-${esc(b.bookingCode)}" ${allowReschedule ? '' : 'disabled'}>
+                <option value="">Chọn slot mới</option>
+                ${rescheduleOptions}
+              </select>
+              <button class="mini" ${allowReschedule ? '' : 'disabled'} onclick="rescheduleBooking('${esc(b.bookingCode)}')">Reschedule</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="muted">Chưa có booking.</td></tr>';
+    }
+  }
+
+  function renderSlots() {
+    const tbody = document.getElementById('slot-table');
+    const slots = adminState.snapshot.slots || [];
+
+    tbody.innerHTML = slots.map((s) => {
+      const isBooked = s.status === adminState.snapshot.status.SLOT_BOOKED;
+      const willBlock = s.status !== adminState.snapshot.status.SLOT_BLOCKED;
+      const nextStatus = willBlock ? adminState.snapshot.status.SLOT_BLOCKED : adminState.snapshot.status.SLOT_EMPTY;
+      const label = willBlock ? 'Block' : 'Unblock';
+
+      return `
+        <tr>
+          <td>${esc(s.date)}</td>
+          <td>${esc(s.start)}-${esc(s.end)}</td>
+          <td>${esc(s.status)}</td>
+          <td>
+            <button class="mini" ${isBooked ? 'disabled' : ''} onclick="changeSlotStatus('${esc(s.slotKey)}','${esc(nextStatus)}')">${label}</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    if (!slots.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="muted">Chưa có slot.</td></tr>';
+    }
+  }
+
+  function onAuthFailed(err) {
+    const msg = (err && err.message) ? err.message : 'Phiên admin không hợp lệ.';
+    setAdminStatus(msg);
+    if (msg.includes('Phiên admin') || msg.includes('phien admin')) {
+      sessionStorage.removeItem('tarot_admin_token');
+      adminState.token = '';
+      showDashboard(false);
+    }
+  }
+
+  function loadSnapshot() {
+    if (!adminState.token) return;
+
+    setAdminStatus('Đang tải dữ liệu...');
+    google.script.run
+      .withSuccessHandler((snapshot) => {
+        adminState.snapshot = snapshot;
+        renderBookings();
+        renderSlots();
+        setAdminStatus('Đã cập nhật dữ liệu.');
+      })
+      .withFailureHandler(onAuthFailed)
+      .getAdminSnapshot(withAdminToken());
+  }
+
+  function loginAdmin() {
+    const pin = document.getElementById('admin-pin').value || '';
+    if (pin.trim().length < 6) {
+      alert('PIN admin tối thiểu 6 ký tự.');
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler((res) => {
+        adminState.token = res.token;
+        sessionStorage.setItem('tarot_admin_token', res.token);
+        showDashboard(true);
+        document.getElementById('admin-pin').value = '';
+        loadSnapshot();
+      })
+      .withFailureHandler((err) => {
+        alert('Đăng nhập thất bại: ' + err.message);
+      })
+      .adminLogin({ pin });
+  }
+
+  function logoutAdmin() {
+    const token = adminState.token;
+    sessionStorage.removeItem('tarot_admin_token');
+    adminState.token = '';
+    adminState.snapshot = null;
+    showDashboard(false);
+    if (!token) return;
+
+    google.script.run
+      .withSuccessHandler(() => {})
+      .withFailureHandler(() => {})
+      .adminLogout({ adminToken: token });
+  }
+
+  function changeStatus(bookingCode, newStatus) {
+    const note = prompt('Ghi chú email (tuỳ chọn):', '') || '';
+    setAdminStatus('Đang cập nhật trạng thái booking...');
+
+    google.script.run
+      .withSuccessHandler(() => {
+        loadSnapshot();
+      })
+      .withFailureHandler(onAuthFailed)
+      .updateBookingStatus(withAdminToken({ bookingCode, newStatus, note }));
+  }
+
+  function rescheduleBooking(bookingCode) {
+    const select = document.getElementById('rs-' + bookingCode);
+    const newSlotKey = select ? select.value : '';
+    if (!newSlotKey) {
+      setAdminStatus('Vui lòng chọn slot mới trước khi dời lịch.');
+      return;
+    }
+
+    const note = prompt('Ghi chú dời lịch gửi email (tuỳ chọn):', '') || '';
+    setAdminStatus('Đang dời lịch...');
+
+    google.script.run
+      .withSuccessHandler(() => {
+        loadSnapshot();
+      })
+      .withFailureHandler(onAuthFailed)
+      .updateBookingStatus(withAdminToken({
+        bookingCode,
+        newStatus: adminState.snapshot.status.BOOKING_RESCHEDULED,
+        newSlotKey,
+        note
+      }));
+  }
+
+  function changeSlotStatus(slotKey, newStatus) {
+    setAdminStatus('Đang cập nhật slot...');
+    google.script.run
+      .withSuccessHandler(() => {
+        loadSnapshot();
+      })
+      .withFailureHandler(onAuthFailed)
+      .adminSetSlotStatus(withAdminToken({ slotKey, newStatus }));
+  }
+
+  document.getElementById('login-btn').addEventListener('click', loginAdmin);
+  document.getElementById('refresh-btn').addEventListener('click', loadSnapshot);
+  document.getElementById('logout-btn').addEventListener('click', logoutAdmin);
+
+  showDashboard(Boolean(adminState.token));
+  if (adminState.token) {
+    loadSnapshot();
+  }
+</script>

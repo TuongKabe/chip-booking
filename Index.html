@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tarot Booking</title>
+    <?!= include('Styles'); ?>
+  </head>
+  <body>
+    <main class="container">
+      <header class="hero">
+        <p class="eyebrow">Tarot Booking</p>
+        <h1>Mèo Tiên Tri lấp lánh cỏ hoa</h1>
+        <p>Đặt lịch nhanh, giữ chỗ tạm thời 30 phút, upload biên lai trực tiếp.</p>
+      </header>
+
+      <section class="card" id="step-services">
+        <h2>Bước 1: Chọn Combo</h2>
+        <div id="service-list" class="grid"></div>
+      </section>
+
+      <section class="card" id="step-slots">
+        <h2>Bước 2: Chọn Khung Giờ</h2>
+        <div id="slot-list" class="grid"></div>
+      </section>
+
+      <section class="card" id="step-form">
+        <h2>Bước 3: Điền thông tin</h2>
+        <form id="booking-form">
+          <label>Họ và tên *<input required name="fullName" type="text" /></label>
+          <label>Zalo/SĐT *<input required name="phone" type="text" /></label>
+          <label>Email *<input required name="email" type="email" /></label>
+          <label>Ngày sinh (tuỳ chọn)<input name="dob" type="date" /></label>
+          <label>Vấn đề đang gặp (tuỳ chọn)<textarea name="issueSummary" rows="4"></textarea></label>
+          <button type="submit">Tạo đơn và giữ chỗ</button>
+        </form>
+      </section>
+
+      <section class="card hidden" id="step-payment">
+        <h2>Bước 4: Thanh toán</h2>
+        <div id="booking-summary"></div>
+        <div class="payment-grid">
+          <div>
+            <img id="qr-image" alt="Bank QR" class="qr" />
+            <p class="muted">Nội dung CK bắt buộc: <strong id="transfer-note"></strong></p>
+          </div>
+          <div>
+            <p><strong>Ngân hàng:</strong> <span id="bank-name"></span></p>
+            <p><strong>Số TK:</strong> <span id="bank-number"></span></p>
+            <p><strong>Chủ TK:</strong> <span id="bank-owner"></span></p>
+            <p><strong>Còn lại:</strong> <span id="countdown">--:--</span></p>
+
+            <label class="upload">
+              Upload ảnh biên lai *
+              <input id="bill-file" type="file" accept="image/*" />
+            </label>
+            <button id="upload-btn" type="button">Tải biên lai</button>
+            <p id="upload-result" class="muted"></p>
+          </div>
+        </div>
+      </section>
+
+      <p class="muted" id="status-text"></p>
+    </main>
+
+    <?!= include('ClientScript'); ?>
+  </body>
+</html>
+

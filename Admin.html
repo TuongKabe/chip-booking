@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tarot Booking Admin</title>
+    <?!= include('Styles'); ?>
+    <style>
+      .toolbar {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .toolbar button {
+        width: auto;
+        padding: 8px 12px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th, td {
+        border: 1px solid var(--border);
+        padding: 8px;
+        vertical-align: top;
+      }
+      th {
+        background: #f3efe2;
+        text-align: left;
+      }
+      .inline {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .inline select,
+      .inline input,
+      .inline button {
+        width: auto;
+        margin-top: 0;
+      }
+      .mini {
+        padding: 6px 8px;
+        font-size: 12px;
+      }
+      .scroll {
+        overflow-x: auto;
+      }
+      #dashboard.hidden,
+      #login-card.hidden { display: none; }
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <header class="hero">
+        <p class="eyebrow">Tarot Booking</p>
+        <h1>Admin Dashboard</h1>
+        <p>Quản lý booking, block lịch đột xuất, xác nhận/huỷ/dời lịch.</p>
+      </header>
+
+      <section class="card" id="login-card">
+        <h2>Đăng nhập Admin</h2>
+        <label>PIN Admin
+          <input id="admin-pin" type="password" minlength="6" autocomplete="current-password" />
+        </label>
+        <button id="login-btn" type="button">Đăng nhập</button>
+        <p class="muted">Cần cấu hình PIN bằng hàm <code>setAdminPin('your-pin')</code> trong Apps Script editor.</p>
+      </section>
+
+      <div id="dashboard" class="hidden">
+        <section class="card">
+          <div class="toolbar">
+            <button id="refresh-btn" type="button">Tải lại dữ liệu</button>
+            <button id="logout-btn" type="button">Đăng xuất</button>
+          </div>
+          <p class="muted" id="admin-status"></p>
+        </section>
+
+        <section class="card">
+          <h2>Đơn Booking</h2>
+          <div class="scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Mã</th>
+                  <th>Querent</th>
+                  <th>Combo</th>
+                  <th>Lịch</th>
+                  <th>Trạng thái</th>
+                  <th>Bill</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="booking-table"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Khung Giờ</h2>
+          <div class="scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ngày</th>
+                  <th>Khung giờ</th>
+                  <th>Trạng thái</th>
+                  <th>Block/Unblock</th>
+                </tr>
+              </thead>
+              <tbody id="slot-table"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <?!= include('AdminScript'); ?>
+  </body>
+</html>
