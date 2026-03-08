@@ -13,10 +13,11 @@ function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
+/* ========== SETUP ========== */
+
 function setupWorkbook() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   getOrCreateSheet_(ss, CONFIG.SHEETS.SERVICES, HEADERS.SERVICES);
-  getOrCreateSheet_(ss, CONFIG.SHEETS.SLOTS, HEADERS.SLOTS);
   getOrCreateSheet_(ss, CONFIG.SHEETS.BOOKINGS, HEADERS.BOOKINGS);
   SpreadsheetApp.flush();
 }
@@ -27,17 +28,19 @@ function seedDefaultServices() {
   if (sheet.getLastRow() > 1) return;
 
   var sample = [
-    ['No.18', 'Su nghiep', 'Combo No.18', 399000, 16, '- Cau hoi 1\n- Cau hoi 2'],
-    ['No.19', 'Su nghiep', 'Combo No.19', 499000, 20, '- Cau hoi 1\n- Cau hoi 2'],
-    ['No.20', 'Su nghiep', 'Combo No.20', 599000, 24, '- Cau hoi 1\n- Cau hoi 2'],
-    ['No.21', 'Su nghiep', 'Combo No.21', 699000, 28, '- Cau hoi 1\n- Cau hoi 2'],
-    ['No.22', 'Ban than', 'Combo No.22', 399000, 16, '- Cau hoi 1\n- Cau hoi 2'],
-    ['No.23', 'Ban than', 'Combo No.23', 499000, 20, '- Cau hoi 1\n- Cau hoi 2'],
-    ['No.24', 'Ban than', 'Combo No.24', 599000, 24, '- Cau hoi 1\n- Cau hoi 2'],
-    ['No.25', 'Ban than', 'Combo No.25', 699000, 28, '- Cau hoi 1\n- Cau hoi 2']
+    ['No.18', 'Sự nghiệp', 'Combo No.18', 399000, 16, '- Câu hỏi 1\n- Câu hỏi 2'],
+    ['No.19', 'Sự nghiệp', 'Combo No.19', 499000, 20, '- Câu hỏi 1\n- Câu hỏi 2'],
+    ['No.20', 'Sự nghiệp', 'Combo No.20', 599000, 24, '- Câu hỏi 1\n- Câu hỏi 2'],
+    ['No.21', 'Sự nghiệp', 'Combo No.21', 699000, 28, '- Câu hỏi 1\n- Câu hỏi 2'],
+    ['No.22', 'Bản thân', 'Combo No.22', 399000, 16, '- Câu hỏi 1\n- Câu hỏi 2'],
+    ['No.23', 'Bản thân', 'Combo No.23', 499000, 20, '- Câu hỏi 1\n- Câu hỏi 2'],
+    ['No.24', 'Bản thân', 'Combo No.24', 599000, 24, '- Câu hỏi 1\n- Câu hỏi 2'],
+    ['No.25', 'Bản thân', 'Combo No.25', 699000, 28, '- Câu hỏi 1\n- Câu hỏi 2']
   ];
   sheet.getRange(2, 1, sample.length, sample[0].length).setValues(sample);
 }
+
+/* ========== PUBLIC API ========== */
 
 function getPublicConfig() {
   var uploadCfg = CONFIG.UPLOAD || {};
@@ -71,35 +74,10 @@ function getServices() {
 }
 
 function getAvailableSlots() {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SHEETS.SLOTS);
-  if (!sheet) return [];
-
-  var now = new Date();
-  return getRowsAsObjects_(sheet)
-    .map(function(r) {
-      var dateStr = normalizeDate_(r['Ngay']);
-      var startStr = normalizeTime_(r['Gio bat dau']);
-      var endStr = normalizeTime_(r['Gio ket thuc']);
-      return {
-        date: dateStr,
-        start: startStr,
-        end: endStr,
-        status: r['Trang thai'],
-        slotKey: slotKey_(dateStr, startStr, endStr),
-        startsAt: parseDateTime_(dateStr, startStr)
-      };
-    })
-    .filter(function(slot) {
-      return slot.status === CONFIG.STATUS.SLOT_EMPTY && slot.startsAt > now;
-    })
-    .sort(function(a, b) {
-      return a.startsAt - b.startsAt;
-    })
-    .map(function(slot) {
-      delete slot.startsAt;
-      return slot;
-    });
+  return getAvailableSlotsFromCalendar_();
 }
+
+/* ========== BOOKING ========== */
 
 function createPendingBooking(payload) {
   requireField_(payload.fullName, 'fullName');
@@ -113,11 +91,10 @@ function createPendingBooking(payload) {
 
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var slotSheet = ss.getSheetByName(CONFIG.SHEETS.SLOTS);
     var bookingSheet = ss.getSheetByName(CONFIG.SHEETS.BOOKINGS);
     var serviceSheet = ss.getSheetByName(CONFIG.SHEETS.SERVICES);
 
-    if (!slotSheet || !bookingSheet || !serviceSheet) {
+    if (!bookingSheet || !serviceSheet) {
       throw new Error('Workbook chưa được khởi tạo. Chạy setupWorkbook() trước.');
     }
 
@@ -126,21 +103,16 @@ function createPendingBooking(payload) {
     });
     if (!service) throw new Error('Combo không hợp lệ.');
 
-    var slotRows = getRowsAsObjects_(slotSheet);
-    var targetSlot = slotRows.find(function(s) {
-      var key = slotKey_(normalizeDate_(s['Ngay']), normalizeTime_(s['Gio bat dau']), normalizeTime_(s['Gio ket thuc']));
-      return key === payload.slotKey;
+    // Lấy slot từ Calendar
+    var slots = getAvailableSlotsFromCalendar_();
+    var targetSlot = slots.find(function(s) {
+      return s.slotKey === payload.slotKey;
     });
-    if (!targetSlot) throw new Error('Khung giờ không tìm thấy.');
-    if (targetSlot['Trang thai'] !== CONFIG.STATUS.SLOT_EMPTY) {
-      throw new Error('Khung giờ này không còn trống.');
-    }
+    if (!targetSlot) throw new Error('Khung giờ không tìm thấy hoặc đã được book.');
 
     var bookingCode = bookingCode_();
     var now = new Date();
-    var paymentDeadline = new Date(now.getTime() + CONFIG.PAYMENT_TIMEOUT_MINUTES * 60 * 1000);
-
-    slotSheet.getRange(targetSlot._rowIndex, 4).setValue(CONFIG.STATUS.SLOT_BOOKED);
+    var paymentDeadline = new Date(now.getTime() + CONFIG.PAYMENT_TIMEOUT_MINUTES * 60000);
 
     var bookingObj = {
       'Ma Booking': bookingCode,
@@ -151,42 +123,47 @@ function createPendingBooking(payload) {
       'DOB': payload.dob || '',
       'Combo ID': service['ID Combo'],
       'Ten Combo': service['Ten Combo'],
-      'Ngay book': normalizeDate_(targetSlot['Ngay']),
-      'Gio bat dau': normalizeTime_(targetSlot['Gio bat dau']),
-      'Gio ket thuc': normalizeTime_(targetSlot['Gio ket thuc']),
+      'Ngay book': targetSlot.date,
+      'Gio bat dau': targetSlot.start,
+      'Gio ket thuc': targetSlot.end,
       'Trang thai': CONFIG.STATUS.BOOKING_PENDING,
       'Link anh Bill': '',
       'Mo ta van de': payload.issueSummary || '',
       'Han thanh toan': paymentDeadline,
+      'Calendar Event ID': '',
       'Created at': nowIso_(),
       'Updated at': nowIso_()
     };
 
-    bookingSheet.appendRow(mapRowFromHeaders_(HEADERS.BOOKINGS, bookingObj));
+    // Xoá event "Nhận khách" + tạo event booking trên Calendar
+    removeAvailableEvent_(targetSlot.date, targetSlot.start, targetSlot.end);
+    var calEventId = createBookingEvent_(bookingObj);
+    bookingObj['Calendar Event ID'] = calEventId;
 
+    appendRowFromObject_(bookingSheet, bookingObj, HEADERS.BOOKINGS);
     sendPendingEmail_(bookingObj);
 
     return {
-      success: true,
       bookingCode: bookingCode,
       paymentDeadlineIso: paymentDeadline.toISOString(),
       slot: {
-        date: bookingObj['Ngay book'],
-        start: bookingObj['Gio bat dau'],
-        end: bookingObj['Gio ket thuc']
+        date: targetSlot.date,
+        start: targetSlot.start,
+        end: targetSlot.end
       },
-      comboName: bookingObj['Ten Combo']
+      comboName: service['Ten Combo']
     };
   } finally {
     lock.releaseLock();
   }
 }
 
+/* ========== BILL UPLOAD ========== */
+
 function uploadBillImage(payload) {
   requireField_(payload.bookingCode, 'bookingCode');
-  requireField_(payload.fileName, 'fileName');
-  requireField_(payload.mimeType, 'mimeType');
   requireField_(payload.base64, 'base64');
+  requireField_(payload.mimeType, 'mimeType');
 
   var mimeType = String(payload.mimeType).toLowerCase().trim();
   var uploadCfg = CONFIG.UPLOAD || {};
@@ -239,30 +216,26 @@ function uploadBillImage(payload) {
     if (safeName.length > 120) {
       safeName = safeName.slice(-120);
     }
-    var finalName = booking['Ma Booking'] + '_' + new Date().getTime() + '_' + safeName;
-    var blob = Utilities.newBlob(bytes, mimeType, finalName);
 
-    var folder;
-    if (CONFIG.DRIVE_FOLDER_ID && CONFIG.DRIVE_FOLDER_ID !== 'REPLACE_WITH_DRIVE_FOLDER_ID') {
-      folder = DriveApp.getFolderById(CONFIG.DRIVE_FOLDER_ID);
-    } else {
-      folder = DriveApp.getRootFolder();
-    }
+    var blob = Utilities.newBlob(bytes, mimeType, booking['Ma Booking'] + '_' + safeName);
 
+    var folder = DriveApp.getFolderById(CONFIG.DRIVE_FOLDER_ID);
     var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     var fileUrl = file.getUrl();
 
-    bookingSheet.getRange(booking._rowIndex, HEADERS.BOOKINGS.indexOf('Link anh Bill') + 1).setValue(fileUrl);
-    bookingSheet.getRange(booking._rowIndex, HEADERS.BOOKINGS.indexOf('Updated at') + 1).setValue(nowIso_());
+    bookingSheet.getRange(booking._rowIndex, HEADERS.BOOKINGS.indexOf('Link anh Bill') + 1)
+      .setValue(fileUrl);
+    bookingSheet.getRange(booking._rowIndex, HEADERS.BOOKINGS.indexOf('Updated at') + 1)
+      .setValue(nowIso_());
 
-    return {
-      success: true,
-      fileUrl: fileUrl
-    };
+    return { fileUrl: fileUrl };
   } finally {
     lock.releaseLock();
   }
 }
+
+/* ========== BOOKING STATUS ========== */
 
 function updateBookingStatus(payload) {
   requireAdminSession_(payload && payload.adminToken);
@@ -285,7 +258,6 @@ function updateBookingStatus(payload) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var bookingSheet = ss.getSheetByName(CONFIG.SHEETS.BOOKINGS);
-    var slotSheet = ss.getSheetByName(CONFIG.SHEETS.SLOTS);
 
     var bookingRows = getRowsAsObjects_(bookingSheet);
     var booking = bookingRows.find(function(b) {
@@ -294,23 +266,44 @@ function updateBookingStatus(payload) {
     if (!booking) throw new Error('Không tìm thấy booking.');
 
     var oldStatus = booking['Trang thai'];
-    var oldSlotKey = slotKey_(
-      normalizeDate_(booking['Ngay book']),
-      normalizeTime_(booking['Gio bat dau']),
-      normalizeTime_(booking['Gio ket thuc'])
-    );
+    var oldDate = normalizeDate_(booking['Ngay book']);
+    var oldStart = normalizeTime_(booking['Gio bat dau']);
+    var oldEnd = normalizeTime_(booking['Gio ket thuc']);
 
+    // Cancel → xoá event booking, tạo lại event "Nhận khách"
     if (payload.newStatus === CONFIG.STATUS.BOOKING_CANCELLED) {
-      setSlotStatusByKey_(slotSheet, oldSlotKey, CONFIG.STATUS.SLOT_EMPTY);
+      var oldEventId = booking['Calendar Event ID'];
+      removeBookingEvent_(oldEventId);
+      restoreAvailableEvent_(oldDate, oldStart, oldEnd);
     }
 
+    // Reschedule → swap events
     if (payload.newStatus === CONFIG.STATUS.BOOKING_RESCHEDULED) {
       requireField_(payload.newSlotKey, 'newSlotKey');
-      setSlotStatusByKey_(slotSheet, oldSlotKey, CONFIG.STATUS.SLOT_EMPTY);
-      var target = setSlotStatusByKey_(slotSheet, payload.newSlotKey, CONFIG.STATUS.SLOT_BOOKED, true);
-      bookingSheet.getRange(booking._rowIndex, HEADERS.BOOKINGS.indexOf('Ngay book') + 1).setValue(target.date);
-      bookingSheet.getRange(booking._rowIndex, HEADERS.BOOKINGS.indexOf('Gio bat dau') + 1).setValue(target.start);
-      bookingSheet.getRange(booking._rowIndex, HEADERS.BOOKINGS.indexOf('Gio ket thuc') + 1).setValue(target.end);
+
+      // Restore old slot
+      var oldEventId2 = booking['Calendar Event ID'];
+      removeBookingEvent_(oldEventId2);
+      restoreAvailableEvent_(oldDate, oldStart, oldEnd);
+
+      // Book new slot
+      var newSlots = getAvailableSlotsFromCalendar_();
+      var newSlot = newSlots.find(function(s) { return s.slotKey === payload.newSlotKey; });
+      if (!newSlot) throw new Error('Khung giờ mới không tìm thấy hoặc đã được book.');
+
+      removeAvailableEvent_(newSlot.date, newSlot.start, newSlot.end);
+
+      // Update booking data
+      bookingSheet.getRange(booking._rowIndex, HEADERS.BOOKINGS.indexOf('Ngay book') + 1).setValue(newSlot.date);
+      bookingSheet.getRange(booking._rowIndex, HEADERS.BOOKINGS.indexOf('Gio bat dau') + 1).setValue(newSlot.start);
+      bookingSheet.getRange(booking._rowIndex, HEADERS.BOOKINGS.indexOf('Gio ket thuc') + 1).setValue(newSlot.end);
+
+      // Create new booking event
+      booking['Ngay book'] = newSlot.date;
+      booking['Gio bat dau'] = newSlot.start;
+      booking['Gio ket thuc'] = newSlot.end;
+      var newEventId = createBookingEvent_(booking);
+      bookingSheet.getRange(booking._rowIndex, HEADERS.BOOKINGS.indexOf('Calendar Event ID') + 1).setValue(newEventId);
     }
 
     bookingSheet.getRange(booking._rowIndex, HEADERS.BOOKINGS.indexOf('Trang thai') + 1).setValue(payload.newStatus);
@@ -324,32 +317,13 @@ function updateBookingStatus(payload) {
       sendStatusChangedEmail_(reloaded, oldStatus, payload.note || '');
     }
 
-    return {
-      success: true
-    };
+    return { success: true };
   } finally {
     lock.releaseLock();
   }
 }
 
-function setSlotStatusByKey_(slotSheet, key, newStatus, enforceEmptyBeforeBook) {
-  var rows = getRowsAsObjects_(slotSheet);
-  var row = rows.find(function(s) {
-    return slotKey_(normalizeDate_(s['Ngay']), normalizeTime_(s['Gio bat dau']), normalizeTime_(s['Gio ket thuc'])) === key;
-  });
-
-  if (!row) throw new Error('Slot key not found: ' + key);
-  if (enforceEmptyBeforeBook && row['Trang thai'] !== CONFIG.STATUS.SLOT_EMPTY) {
-    throw new Error('Slot không hợp lệ.');
-  }
-
-  slotSheet.getRange(row._rowIndex, 4).setValue(newStatus);
-  return {
-    date: normalizeDate_(row['Ngay']),
-    start: normalizeTime_(row['Gio bat dau']),
-    end: normalizeTime_(row['Gio ket thuc'])
-  };
-}
+/* ========== TIMEOUT TRIGGER ========== */
 
 function processPendingTimeouts() {
   var lock = LockService.getScriptLock();
@@ -358,8 +332,7 @@ function processPendingTimeouts() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var bookingSheet = ss.getSheetByName(CONFIG.SHEETS.BOOKINGS);
-    var slotSheet = ss.getSheetByName(CONFIG.SHEETS.SLOTS);
-    if (!bookingSheet || !slotSheet) return;
+    if (!bookingSheet) return;
 
     var now = new Date();
     var rows = getRowsAsObjects_(bookingSheet);
@@ -372,16 +345,16 @@ function processPendingTimeouts() {
       if (!(deadlineDate instanceof Date) || isNaN(deadlineDate.getTime())) return;
       if (deadlineDate > now) return;
 
-      var oldSlotKey = slotKey_(
-        normalizeDate_(booking['Ngay book']),
-        normalizeTime_(booking['Gio bat dau']),
-        normalizeTime_(booking['Gio ket thuc'])
-      );
+      // Cancel: xoá event booking, tạo lại "Nhận khách"
+      var date = normalizeDate_(booking['Ngay book']);
+      var start = normalizeTime_(booking['Gio bat dau']);
+      var end = normalizeTime_(booking['Gio ket thuc']);
 
       try {
-        setSlotStatusByKey_(slotSheet, oldSlotKey, CONFIG.STATUS.SLOT_EMPTY);
-      } catch (slotErr) {
-        Logger.log('Warning: could not release slot ' + oldSlotKey + ' - ' + slotErr.message);
+        removeBookingEvent_(booking['Calendar Event ID']);
+        restoreAvailableEvent_(date, start, end);
+      } catch (calErr) {
+        Logger.log('Warning: calendar error for ' + booking['Ma Booking'] + ' - ' + calErr.message);
       }
 
       bookingSheet.getRange(booking._rowIndex, HEADERS.BOOKINGS.indexOf('Trang thai') + 1)
@@ -396,6 +369,8 @@ function processPendingTimeouts() {
     lock.releaseLock();
   }
 }
+
+/* ========== ADMIN AUTH ========== */
 
 function hashAdminPin_(pin) {
   var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(pin), Utilities.Charset.UTF_8);
@@ -464,11 +439,13 @@ function requireAdminSession_(token) {
     throw new Error('Phiên admin hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.');
   }
 }
+
+/* ========== ADMIN SNAPSHOT ========== */
+
 function getAdminSnapshot(payload) {
   requireAdminSession_(payload && payload.adminToken);
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var bookingSheet = ss.getSheetByName(CONFIG.SHEETS.BOOKINGS);
-  var slotSheet = ss.getSheetByName(CONFIG.SHEETS.SLOTS);
 
   var bookings = bookingSheet ? getRowsAsObjects_(bookingSheet).map(function(b) {
     var date = normalizeDate_(b['Ngay book']);
@@ -499,22 +476,8 @@ function getAdminSnapshot(payload) {
     };
   }) : [];
 
-  var slots = slotSheet ? getRowsAsObjects_(slotSheet).map(function(s) {
-    var date = normalizeDate_(s['Ngay']);
-    var start = normalizeTime_(s['Gio bat dau']);
-    var end = normalizeTime_(s['Gio ket thuc']);
-    return {
-      date: date,
-      start: start,
-      end: end,
-      status: s['Trang thai'],
-      slotKey: slotKey_(date, start, end)
-    };
-  }) : [];
-
-  slots.sort(function(a, b) {
-    return parseDateTime_(a.date, a.start) - parseDateTime_(b.date, b.start);
-  });
+  // Slots từ Calendar (bao gồm cả available + booked)
+  var slots = getAllCalendarSlotsForAdmin_();
 
   bookings.sort(function(a, b) {
     return String(b.bookingCode || '').localeCompare(String(a.bookingCode || ''));
@@ -527,42 +490,43 @@ function getAdminSnapshot(payload) {
   };
 }
 
-function adminSetSlotStatus(payload) {
+/* ========== ADMIN SLOT (block = xoá event trên Calendar) ========== */
+
+function adminDeleteSlot(payload) {
   requireAdminSession_(payload && payload.adminToken);
-  requireField_(payload.slotKey, 'slotKey');
-  requireField_(payload.newStatus, 'newStatus');
-
-  if ([CONFIG.STATUS.SLOT_EMPTY, CONFIG.STATUS.SLOT_BLOCKED].indexOf(payload.newStatus) === -1) {
-    throw new Error('Admin chỉ có thể chuyển slot giữa Trống và Block khẩn cấp.');
-  }
-
-  var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  requireField_(payload.eventId, 'eventId');
 
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var slotSheet = ss.getSheetByName(CONFIG.SHEETS.SLOTS);
-    if (!slotSheet) throw new Error('Slot sheet not found.');
-
-    var rows = getRowsAsObjects_(slotSheet);
-    var row = rows.find(function(s) {
-      return slotKey_(normalizeDate_(s['Ngay']), normalizeTime_(s['Gio bat dau']), normalizeTime_(s['Gio ket thuc'])) === payload.slotKey;
-    });
-    if (!row) throw new Error('Slot not found.');
-
-    if (row['Trang thai'] === CONFIG.STATUS.SLOT_BOOKED && payload.newStatus === CONFIG.STATUS.SLOT_BLOCKED) {
-      throw new Error('Không thể block slot đang Đa Book. Hãy xử lý booking trước.');
+    var cal = getBookingCalendar_();
+    var event = cal.getEventById(payload.eventId);
+    if (event) {
+      event.deleteEvent();
     }
-
-    slotSheet.getRange(row._rowIndex, 4).setValue(payload.newStatus);
     return { success: true };
-  } finally {
-    lock.releaseLock();
+  } catch (e) {
+    throw new Error('Không thể xoá event: ' + e.message);
   }
 }
+
+function adminCreateSlot(payload) {
+  requireAdminSession_(payload && payload.adminToken);
+  requireField_(payload.date, 'date');
+  requireField_(payload.start, 'start');
+  requireField_(payload.end, 'end');
+
+  var cal = getBookingCalendar_();
+  var dtStart = parseDateTime_(payload.date, payload.start);
+  var dtEnd = parseDateTime_(payload.date, payload.end);
+
+  cal.createEvent(CONFIG.CALENDAR.AVAILABLE_TITLE, dtStart, dtEnd);
+  return { success: true };
+}
+
+/* ========== TRIGGERS ========== */
+
 function installTriggers() {
-  var all = ScriptApp.getProjectTriggers();
-  all.forEach(function(t) {
+  var triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function(t) {
     if (t.getHandlerFunction() === 'processPendingTimeouts') {
       ScriptApp.deleteTrigger(t);
     }
@@ -573,15 +537,3 @@ function installTriggers() {
     .everyMinutes(CONFIG.TIME_DRIVEN_MINUTES)
     .create();
 }
-
-
-
-
-
-
-
-
-
-
-
-

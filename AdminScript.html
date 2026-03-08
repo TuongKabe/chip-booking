@@ -29,17 +29,18 @@
   function buildRescheduleOptions(currentSlotKey) {
     const slots = adminState.snapshot.slots || [];
     return slots
-      .filter(s => s.status === adminState.snapshot.status.SLOT_EMPTY && s.slotKey !== currentSlotKey)
-      .map(s => `<option value="${esc(s.slotKey)}">${esc(s.date)} ${esc(s.start)}-${esc(s.end)}</option>`)
+      .filter(s => s.status === 'Trống' && s.slotKey !== currentSlotKey)
+      .map(s => `<option value="${esc(s.date + '|' + s.start + '|' + s.end)}">${esc(s.date)} ${esc(s.start)}-${esc(s.end)}</option>`)
       .join('');
   }
+
+  /* ---- BOOKINGS ---- */
 
   function renderBookings() {
     const tbody = document.getElementById('booking-table');
     const statusFilter = document.getElementById('booking-status-filter');
     const allRows = adminState.snapshot.bookings || [];
 
-    // Populate status filter dropdown
     const currentFilter = statusFilter ? statusFilter.value : '';
     const statuses = [...new Set(allRows.map(b => b.status).filter(Boolean))];
     if (statusFilter) {
@@ -53,7 +54,6 @@
       });
     }
 
-    // Filter by status
     const rows = currentFilter ? allRows.filter(b => b.status === currentFilter) : allRows;
 
     tbody.innerHTML = rows.map((b) => {
@@ -108,12 +108,13 @@
     }
   }
 
+  /* ---- SLOTS (Calendar) ---- */
+
   function renderSlots() {
     const tbody = document.getElementById('slot-table');
     const dateFilter = document.getElementById('admin-date-filter');
     const allSlots = adminState.snapshot.slots || [];
 
-    // Populate date filter dropdown (preserve current selection)
     const currentDateVal = dateFilter ? dateFilter.value : '';
     const dates = [...new Set(allSlots.map(s => s.date))].sort();
     if (dateFilter) {
@@ -127,31 +128,31 @@
       });
     }
 
-    // Filter slots by selected date
     const filtered = currentDateVal ? allSlots.filter(s => s.date === currentDateVal) : allSlots;
 
     tbody.innerHTML = filtered.map((s) => {
-      const isBooked = s.status === adminState.snapshot.status.SLOT_BOOKED;
-      const willBlock = s.status !== adminState.snapshot.status.SLOT_BLOCKED;
-      const nextStatus = willBlock ? adminState.snapshot.status.SLOT_BLOCKED : adminState.snapshot.status.SLOT_EMPTY;
-      const label = willBlock ? 'Block' : 'Unblock';
+      const isAvailable = s.status === 'Trống';
+      const statusClass = isAvailable ? 'slot-available' : 'slot-booked';
+      const displayTitle = isAvailable ? '🟢 Trống' : '🔴 ' + esc(s.title);
 
       return `
         <tr>
           <td>${esc(s.date)}</td>
           <td>${esc(s.start)}-${esc(s.end)}</td>
-          <td>${esc(s.status)}</td>
+          <td class="${statusClass}">${displayTitle}</td>
           <td>
-            <button class="mini" ${isBooked ? 'disabled' : ''} onclick="changeSlotStatus('${esc(s.slotKey)}','${esc(nextStatus)}')">${label}</button>
+            ${isAvailable ? `<button class="mini" onclick="deleteSlot('${esc(s.eventId)}')">Xoá slot</button>` : '<span class="muted">—</span>'}
           </td>
         </tr>
       `;
     }).join('');
 
     if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="4" class="muted">Chưa có slot.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" class="muted">Chưa có slot. Tạo event "Nhận khách" trên Google Calendar.</td></tr>';
     }
   }
+
+  /* ---- AUTH ---- */
 
   function onAuthFailed(err) {
     const msg = (err && err.message) ? err.message : 'Phiên admin không hợp lệ.';
@@ -190,10 +191,11 @@
   function loginAdmin() {
     const pin = document.getElementById('admin-pin').value || '';
     if (pin.trim().length < 6) {
-      alert('PIN admin tối thiểu 6 ký tự.');
+      setAdminStatus('PIN phải tối thiểu 6 ký tự.');
       return;
     }
 
+    setAdminStatus('Đang đăng nhập...');
     google.script.run
       .withSuccessHandler((res) => {
         adminState.token = res.token;
@@ -203,29 +205,25 @@
         loadSnapshot();
       })
       .withFailureHandler((err) => {
-        alert('Đăng nhập thất bại: ' + err.message);
+        setAdminStatus('Đăng nhập thất bại: ' + (err && err.message ? err.message : 'Lỗi không xác định.'));
       })
       .adminLogin({ pin });
   }
 
   function logoutAdmin() {
-    const token = adminState.token;
+    google.script.run.withSuccessHandler(() => {}).adminLogout(withAdminToken());
     sessionStorage.removeItem('tarot_admin_token');
     adminState.token = '';
     adminState.snapshot = null;
     showDashboard(false);
-    if (!token) return;
-
-    google.script.run
-      .withSuccessHandler(() => {})
-      .withFailureHandler(() => {})
-      .adminLogout({ adminToken: token });
+    setAdminStatus('');
   }
 
-  function changeStatus(bookingCode, newStatus) {
-    const note = prompt('Ghi chú email (tuỳ chọn):', '') || '';
-    setAdminStatus('Đang cập nhật trạng thái booking...');
+  /* ---- BOOKING ACTIONS ---- */
 
+  function changeStatus(bookingCode, newStatus) {
+    const note = prompt('Ghi chú (tuỳ chọn):', '') || '';
+    setAdminStatus('Đang cập nhật...');
     google.script.run
       .withSuccessHandler(() => {
         loadSnapshot();
@@ -236,11 +234,15 @@
 
   function rescheduleBooking(bookingCode) {
     const select = document.getElementById('rs-' + bookingCode);
-    const newSlotKey = select ? select.value : '';
-    if (!newSlotKey) {
+    const val = select ? select.value : '';
+    if (!val) {
       setAdminStatus('Vui lòng chọn slot mới trước khi dời lịch.');
       return;
     }
+
+    // val format: "date|start|end" → build slotKey
+    const parts = val.split('|');
+    const newSlotKey = parts.join('|');
 
     const note = prompt('Ghi chú dời lịch gửi email (tuỳ chọn):', '') || '';
     setAdminStatus('Đang dời lịch...');
@@ -258,17 +260,47 @@
       }));
   }
 
-  function changeSlotStatus(slotKey, newStatus) {
-    setAdminStatus('Đang cập nhật slot...');
+  /* ---- SLOT ACTIONS (Calendar) ---- */
+
+  function deleteSlot(eventId) {
+    if (!confirm('Xoá slot này khỏi Calendar?')) return;
+    setAdminStatus('Đang xoá slot...');
     google.script.run
       .withSuccessHandler(() => {
         loadSnapshot();
       })
       .withFailureHandler(onAuthFailed)
-      .adminSetSlotStatus(withAdminToken({ slotKey, newStatus }));
+      .adminDeleteSlot(withAdminToken({ eventId }));
   }
 
+  function addSlot() {
+    const date = document.getElementById('new-slot-date').value;
+    const start = document.getElementById('new-slot-start').value;
+    const end = document.getElementById('new-slot-end').value;
+
+    if (!date || !start || !end) {
+      setAdminStatus('Vui lòng điền đầy đủ ngày, giờ bắt đầu và kết thúc.');
+      return;
+    }
+
+    setAdminStatus('Đang thêm slot...');
+    google.script.run
+      .withSuccessHandler(() => {
+        document.getElementById('new-slot-date').value = '';
+        document.getElementById('new-slot-start').value = '';
+        document.getElementById('new-slot-end').value = '';
+        loadSnapshot();
+      })
+      .withFailureHandler(onAuthFailed)
+      .adminCreateSlot(withAdminToken({ date, start, end }));
+  }
+
+  /* ---- EVENT LISTENERS ---- */
+
   document.getElementById('login-btn').addEventListener('click', loginAdmin);
+  document.getElementById('admin-pin').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') loginAdmin();
+  });
   document.getElementById('refresh-btn').addEventListener('click', loadSnapshot);
   document.getElementById('logout-btn').addEventListener('click', logoutAdmin);
   document.getElementById('admin-date-filter').addEventListener('change', () => {
@@ -277,6 +309,7 @@
   document.getElementById('booking-status-filter').addEventListener('change', () => {
     if (adminState.snapshot) renderBookings();
   });
+  document.getElementById('add-slot-btn').addEventListener('click', addSlot);
 
   showDashboard(Boolean(adminState.token));
   if (adminState.token) {

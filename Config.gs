@@ -1,13 +1,14 @@
 var CONFIG = {
   SHEETS: {
     SERVICES: 'Dich_Vu',
-    SLOTS: 'Khung_Gio',
     BOOKINGS: 'Don_Booking'
   },
+  CALENDAR: {
+    ID: 'd7babe3f7bececb215d7d56f59376312cff10e40a99a82ce7ece241bac0aa0cb@group.calendar.google.com',
+    AVAILABLE_TITLE: 'Nhận khách',
+    LOOK_AHEAD_DAYS: 30
+  },
   STATUS: {
-    SLOT_EMPTY: 'Trong',
-    SLOT_BOOKED: 'Da Book',
-    SLOT_BLOCKED: 'Block khan cap',
     BOOKING_PENDING: 'Pending',
     BOOKING_CONFIRMED: 'Confirmed',
     BOOKING_CANCELLED: 'Cancelled',
@@ -41,12 +42,6 @@ var HEADERS = {
     'Gia USD',
     'Noi dung chi tiet'
   ],
-  SLOTS: [
-    'Ngay',
-    'Gio bat dau',
-    'Gio ket thuc',
-    'Trang thai'
-  ],
   BOOKINGS: [
     'Ma Booking',
     'Ten Querent',
@@ -63,6 +58,7 @@ var HEADERS = {
     'Link anh Bill',
     'Mo ta van de',
     'Han thanh toan',
+    'Calendar Event ID',
     'Created at',
     'Updated at'
   ]

@@ -1,4 +1,4 @@
-﻿function nowIso_() {
+function nowIso_() {
   return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd'T'HH:mm:ss");
 }
 
@@ -53,6 +53,11 @@ function mapRowFromHeaders_(headers, obj) {
   return headers.map(function(h) {
     return Object.prototype.hasOwnProperty.call(obj, h) ? obj[h] : '';
   });
+}
+
+function appendRowFromObject_(sheet, obj, headers) {
+  var row = mapRowFromHeaders_(headers, obj);
+  sheet.appendRow(row);
 }
 
 function requireField_(val, fieldName) {

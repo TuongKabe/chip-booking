@@ -28,18 +28,20 @@ function configureAdminPin() {
 function showSetupGuide() {
   var html = HtmlService.createHtmlOutput(
     '<div style="font-family:Arial;padding:16px;line-height:1.6">' +
-      '<h2>Tarot Booking Setup</h2>' +
+      '<h2>Tarot Booking Setup (Calendar Edition)</h2>' +
       '<ol>' +
-        '<li>Chạy <b>Khởi tạo workbook</b> để tạo 3 sheets.</li>' +
+        '<li>Chạy <b>Khởi tạo workbook</b> để tạo 2 sheets (Dich_Vu, Don_Booking).</li>' +
         '<li>Chạy <b>Seed 8 combo mặc định</b> và chỉnh giá/nội dung.</li>' +
         '<li>Chạy <b>Cấu hình PIN Admin</b> để bảo mật dashboard.</li>' +
-        '<li>Điền Khung_Gio với các cột: Ngay, Gio bat dau, Gio ket thuc, Trang thai=Trong.</li>' +
+        '<li><b>Tạo Google Calendar riêng</b> cho Tarot Booking → copy Calendar ID vào Config.gs.</li>' +
+        '<li>Trên Calendar, tạo event "<b>Nhận khách</b>" cho các khung giờ muốn nhận.</li>' +
         '<li>Cấu hình DRIVE_FOLDER_ID và BANK trong Config.gs.</li>' +
         '<li>Chạy <b>Cài trigger timeout</b>.</li>' +
         '<li>Deploy Web App với access: Anyone with link.</li>' +
       '</ol>' +
+      '<p style="color:#136f63;font-weight:bold">📌 Lưu ý: Event trên Calendar phải có tiêu đề chính xác "Nhận khách" thì mới hiện slot cho khách.</p>' +
     '</div>'
-  ).setWidth(540).setHeight(380);
+  ).setWidth(580).setHeight(420);
 
   SpreadsheetApp.getUi().showModalDialog(html, 'Tarot Booking Guide');
 }
