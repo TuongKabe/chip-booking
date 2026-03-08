@@ -51,6 +51,10 @@
       }
       #dashboard.hidden,
       #login-card.hidden { display: none; }
+      .scroll-limited {
+        overflow: auto;
+        max-height: 420px;
+      }
     </style>
   </head>
   <body>
@@ -81,7 +85,12 @@
 
         <section class="card">
           <h2>Đơn Booking</h2>
-          <div class="scroll">
+          <label>Lọc theo trạng thái
+            <select id="booking-status-filter">
+              <option value="">-- Tất cả --</option>
+            </select>
+          </label>
+          <div class="scroll scroll-limited">
             <table>
               <thead>
                 <tr>
@@ -106,7 +115,7 @@
               <option value="">-- Tất cả ngày --</option>
             </select>
           </label>
-          <div class="scroll">
+          <div class="scroll scroll-limited">
             <table>
               <thead>
                 <tr>

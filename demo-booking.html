@@ -145,7 +145,15 @@
       <header class="hero">
         <p class="eyebrow">Tarot Booking</p>
         <h1>Mèo Tiên Tri lấp lánh cỏ hoa</h1>
-        <p>Đặt lịch nhanh, giữ chỗ tạm thời 30 phút, upload biên lai trực tiếp.</p>
+        <div class="intro-text">
+          <p>Chào các cậu, tớ là Chip và đây là mẫu đăng kí đặt lịch xem 1:1 Online hoặc Trực tiếp tại Hà Nội với mình.</p>
+          <p><strong>a. Gói xem online theo vấn đề cụ thể:</strong> Phí xem bài cho gói này là 300.000VND/1h (Phí Paypal: 18$/1h).<br>
+            &nbsp;&nbsp;&nbsp;- Không giới hạn câu hỏi cho 1 vấn đề hỏi trong 1h bạn nhé. Với gói xem này bạn sẽ chuyển khoản trước phí của 1h giúp Chip để đặt lịch xem bài nha.<br>
+            &nbsp;&nbsp;&nbsp;- Có thể đặt nhiều hơn 1h (nếu bạn muốn đặt thêm giờ hãy inbox để báo cho mình nha).</p>
+          <p><strong>b. Gói xem online theo thời gian:</strong> Phí xem bài cho gói này là 350.000VND/1h (Phí Paypal: 23$/1h).<br>
+            &nbsp;&nbsp;&nbsp;- Không giới hạn câu hỏi và vấn đề mà bạn muốn hỏi trong 1h xem. Với gói xem này bạn sẽ chuyển khoản trước phí của 1h giúp Chip để đặt lịch xem bài nha.<br>
+            &nbsp;&nbsp;&nbsp;- Có thể đặt nhiều hơn 1h (nếu bạn muốn đặt thêm giờ hãy inbox để báo cho mình nha).</p>
+        </div>
       </header>
 
       <section class="card" id="step-services">
@@ -177,8 +185,9 @@
         <h2>Bước 3: Điền thông tin</h2>
         <form id="booking-form">
           <label>Họ và tên *<input required name="fullName" type="text" /></label>
-          <label>Zalo/SĐT *<input required name="phone" type="text" /></label>
+          <label>Zalo/SĐT * (10 số)<input required name="phone" type="tel" pattern="[0-9]{10}" title="Vui lòng nhập đúng 10 chữ số" /></label>
           <label>Email *<input required name="email" type="email" /></label>
+          <label>Tên Instagram/Facebook<input name="socialName" type="text" placeholder="@tên hoặc link" /></label>
           <label>Ngày sinh (tuỳ chọn)<input name="dob" type="date" /></label>
           <label>Vấn đề đang gặp (tuỳ chọn)<textarea name="issueSummary" rows="4"></textarea></label>
           <button type="submit">Tạo đơn và giữ chỗ</button>
@@ -532,6 +541,7 @@
           fullName: form.get('fullName'),
           phone: form.get('phone'),
           email: form.get('email'),
+          socialName: form.get('socialName'),
           dob: form.get('dob'),
           issueSummary: form.get('issueSummary'),
           comboId: state.selectedService.comboId,

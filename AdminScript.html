@@ -36,10 +36,30 @@
 
   function renderBookings() {
     const tbody = document.getElementById('booking-table');
-    const rows = adminState.snapshot.bookings || [];
+    const statusFilter = document.getElementById('booking-status-filter');
+    const allRows = adminState.snapshot.bookings || [];
+
+    // Populate status filter dropdown
+    const currentFilter = statusFilter ? statusFilter.value : '';
+    const statuses = [...new Set(allRows.map(b => b.status).filter(Boolean))];
+    if (statusFilter) {
+      statusFilter.innerHTML = '<option value="">-- Tất cả --</option>';
+      statuses.forEach((s) => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s;
+        if (currentFilter === s) opt.selected = true;
+        statusFilter.appendChild(opt);
+      });
+    }
+
+    // Filter by status
+    const rows = currentFilter ? allRows.filter(b => b.status === currentFilter) : allRows;
 
     tbody.innerHTML = rows.map((b) => {
       const rescheduleOptions = buildRescheduleOptions(b.slotKey);
+      const isConfirmed = b.status === adminState.snapshot.status.BOOKING_CONFIRMED;
+      const isCancelled = b.status === adminState.snapshot.status.BOOKING_CANCELLED;
       const allowConfirm = b.status === adminState.snapshot.status.BOOKING_PENDING;
       const allowCancel = [
         adminState.snapshot.status.BOOKING_PENDING,
@@ -52,12 +72,15 @@
         adminState.snapshot.status.BOOKING_RESCHEDULED
       ].includes(b.status);
 
+      const confirmBtnStyle = isConfirmed ? 'background:#28a745;color:#fff;' : isCancelled ? 'background:#ccc;' : '';
+      const confirmBtnText = isConfirmed ? '✓ Đã xác nhận' : isCancelled ? 'Đã huỷ' : 'Confirm';
+
       return `
         <tr>
           <td>${esc(b.bookingCode)}</td>
           <td>
             <strong>${esc(b.fullName)}</strong><br>
-            <span class="muted">${esc(b.phone)}<br>${esc(b.email)}</span>
+            <span class="muted">${esc(b.phone)}<br>${esc(b.email)}${b.socialName ? '<br>' + esc(b.socialName) : ''}</span>
           </td>
           <td>${esc(b.comboName)}</td>
           <td>${esc(b.date)}<br>${esc(b.start)}-${esc(b.end)}</td>
@@ -65,15 +88,15 @@
           <td>${b.billUrl ? `<a href="${esc(b.billUrl)}" target="_blank">Xem bill</a>` : '<span class="muted">Chưa có</span>'}</td>
           <td>
             <div class="inline">
-              <button class="mini" ${allowConfirm ? '' : 'disabled'} onclick="changeStatus('${esc(b.bookingCode)}','${esc(adminState.snapshot.status.BOOKING_CONFIRMED)}')">Confirm</button>
-              <button class="mini" ${allowCancel ? '' : 'disabled'} onclick="changeStatus('${esc(b.bookingCode)}','${esc(adminState.snapshot.status.BOOKING_CANCELLED)}')">Cancel</button>
+              <button class="mini" style="${confirmBtnStyle}" ${allowConfirm ? '' : 'disabled'} onclick="changeStatus('${esc(b.bookingCode)}','${esc(adminState.snapshot.status.BOOKING_CONFIRMED)}')">${confirmBtnText}</button>
+              <button class="mini" ${allowCancel ? '' : 'disabled'} onclick="changeStatus('${esc(b.bookingCode)}','${esc(adminState.snapshot.status.BOOKING_CANCELLED)}')">${isCancelled ? '✗ Đã huỷ' : 'Cancel'}</button>
             </div>
             <div class="inline" style="margin-top:6px;">
               <select id="rs-${esc(b.bookingCode)}" ${allowReschedule ? '' : 'disabled'}>
                 <option value="">Chọn slot mới</option>
                 ${rescheduleOptions}
               </select>
-              <button class="mini" ${allowReschedule ? '' : 'disabled'} onclick="rescheduleBooking('${esc(b.bookingCode)}')">Reschedule</button>
+              <button class="mini" ${allowReschedule ? '' : 'disabled'} onclick="rescheduleBooking('${esc(b.bookingCode)}')">${b.status === adminState.snapshot.status.BOOKING_RESCHEDULED ? '✓ Đã dời' : 'Reschedule'}</button>
             </div>
           </td>
         </tr>
@@ -250,6 +273,9 @@
   document.getElementById('logout-btn').addEventListener('click', logoutAdmin);
   document.getElementById('admin-date-filter').addEventListener('change', () => {
     if (adminState.snapshot) renderSlots();
+  });
+  document.getElementById('booking-status-filter').addEventListener('change', () => {
+    if (adminState.snapshot) renderBookings();
   });
 
   showDashboard(Boolean(adminState.token));

@@ -1,4 +1,4 @@
-﻿var CONFIG = {
+var CONFIG = {
   SHEETS: {
     SERVICES: 'Dich_Vu',
     SLOTS: 'Khung_Gio',
@@ -52,6 +52,7 @@ var HEADERS = {
     'Ten Querent',
     'Zalo/SDT',
     'Email',
+    'Insta/Facebook',
     'DOB',
     'Combo ID',
     'Ten Combo',
