@@ -1,7 +1,7 @@
-function doGet(e) {
+﻿function doGet(e) {
   var page = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase() : 'booking';
   var templateName = page === 'admin' ? 'Admin' : 'Index';
-  var title = page === 'admin' ? 'Tarot Booking Admin - Mèo Tiên Tri' : 'Tarot Booking - Mèo Tiên Tri';
+  var title = page === 'admin' ? 'Tarot Booking Admin - MÃ¨o TiÃªn Tri' : 'Tarot Booking - MÃ¨o TiÃªn Tri';
 
   return HtmlService.createTemplateFromFile(templateName)
     .evaluate()
@@ -40,12 +40,16 @@ function seedDefaultServices() {
 }
 
 function getPublicConfig() {
+  var uploadCfg = CONFIG.UPLOAD || {};
+  var allowed = uploadCfg.ALLOWED_BILL_MIME_TYPES || ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+  var maxMb = Number(uploadCfg.MAX_BILL_SIZE_MB || 8);
+
   return {
     bank: CONFIG.BANK,
     paymentTimeoutMinutes: CONFIG.PAYMENT_TIMEOUT_MINUTES,
     upload: {
-      maxBillSizeMb: CONFIG.UPLOAD.MAX_BILL_SIZE_MB,
-      allowedBillMimeTypes: CONFIG.UPLOAD.ALLOWED_BILL_MIME_TYPES
+      maxBillSizeMb: maxMb,
+      allowedBillMimeTypes: allowed
     }
   };
 }
@@ -114,22 +118,22 @@ function createPendingBooking(payload) {
     var serviceSheet = ss.getSheetByName(CONFIG.SHEETS.SERVICES);
 
     if (!slotSheet || !bookingSheet || !serviceSheet) {
-      throw new Error('Workbook chưa được khởi tạo. Chạy setupWorkbook() trước.');
+      throw new Error('Workbook chÆ°a Ä‘Æ°á»£c khá»Ÿi táº¡o. Cháº¡y setupWorkbook() trÆ°á»›c.');
     }
 
     var service = getRowsAsObjects_(serviceSheet).find(function(s) {
       return String(s['ID Combo']) === String(payload.comboId);
     });
-    if (!service) throw new Error('Combo không hợp lệ.');
+    if (!service) throw new Error('Combo khÃ´ng há»£p lá»‡.');
 
     var slotRows = getRowsAsObjects_(slotSheet);
     var targetSlot = slotRows.find(function(s) {
       var key = slotKey_(normalizeDate_(s['Ngay']), normalizeTime_(s['Gio bat dau']), normalizeTime_(s['Gio ket thuc']));
       return key === payload.slotKey;
     });
-    if (!targetSlot) throw new Error('Khung giờ không tìm thấy.');
+    if (!targetSlot) throw new Error('Khung giá» khÃ´ng tÃ¬m tháº¥y.');
     if (targetSlot['Trang thai'] !== CONFIG.STATUS.SLOT_EMPTY) {
-      throw new Error('Khung giờ này không còn trống.');
+      throw new Error('Khung giá» nÃ y khÃ´ng cÃ²n trá»‘ng.');
     }
 
     var bookingCode = bookingCode_();
@@ -184,9 +188,10 @@ function uploadBillImage(payload) {
   requireField_(payload.base64, 'base64');
 
   var mimeType = String(payload.mimeType).toLowerCase().trim();
-  var allowed = CONFIG.UPLOAD.ALLOWED_BILL_MIME_TYPES || [];
+  var uploadCfg = CONFIG.UPLOAD || {};
+  var allowed = uploadCfg.ALLOWED_BILL_MIME_TYPES || ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
   if (allowed.indexOf(mimeType) === -1) {
-    throw new Error('Định dạng ảnh không hợp lệ. Chỉ hỗ trợ: ' + allowed.join(', '));
+    throw new Error('Äá»‹nh dáº¡ng áº£nh khÃ´ng há»£p lá»‡. Chá»‰ há»— trá»£: ' + allowed.join(', '));
   }
 
   var lock = LockService.getScriptLock();
@@ -204,28 +209,29 @@ function uploadBillImage(payload) {
     if (!booking) throw new Error('Booking not found.');
 
     if (booking['Trang thai'] !== CONFIG.STATUS.BOOKING_PENDING) {
-      throw new Error('Chỉ cho phép upload bill khi booking đang Pending.');
+      throw new Error('Chá»‰ cho phÃ©p upload bill khi booking Ä‘ang Pending.');
     }
 
     var deadline = booking['Han thanh toan'];
     var deadlineDate = deadline instanceof Date ? deadline : new Date(deadline);
     if (deadlineDate instanceof Date && !isNaN(deadlineDate.getTime()) && deadlineDate < new Date()) {
-      throw new Error('Đã quá hạn thanh toán, không thể upload bill cho booking này.');
+      throw new Error('ÄÃ£ quÃ¡ háº¡n thanh toÃ¡n, khÃ´ng thá»ƒ upload bill cho booking nÃ y.');
     }
 
     var bytes;
     try {
       bytes = Utilities.base64Decode(payload.base64);
     } catch (err) {
-      throw new Error('Dữ liệu ảnh không hợp lệ.');
+      throw new Error('Dá»¯ liá»‡u áº£nh khÃ´ng há»£p lá»‡.');
     }
 
-    var maxBytes = CONFIG.UPLOAD.MAX_BILL_SIZE_MB * 1024 * 1024;
+    var maxMb = Number(uploadCfg.MAX_BILL_SIZE_MB || 8);
+    var maxBytes = maxMb * 1024 * 1024;
     if (!bytes || bytes.length === 0) {
-      throw new Error('File ảnh trống.');
+      throw new Error('File áº£nh trá»‘ng.');
     }
     if (bytes.length > maxBytes) {
-      throw new Error('File quá lớn. Giới hạn ' + CONFIG.UPLOAD.MAX_BILL_SIZE_MB + 'MB.');
+      throw new Error('File quÃ¡ lá»›n. Giá»›i háº¡n ' + CONFIG.UPLOAD.MAX_BILL_SIZE_MB + 'MB.');
     }
 
     var safeName = String(payload.fileName || 'bill').replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -269,7 +275,7 @@ function updateBookingStatus(payload) {
     CONFIG.STATUS.BOOKING_RESCHEDULED
   ];
   if (valid.indexOf(payload.newStatus) === -1) {
-    throw new Error('Trạng thái không hợp lệ.');
+    throw new Error('Tráº¡ng thÃ¡i khÃ´ng há»£p lá»‡.');
   }
 
   var lock = LockService.getScriptLock();
@@ -284,7 +290,7 @@ function updateBookingStatus(payload) {
     var booking = bookingRows.find(function(b) {
       return String(b['Ma Booking']) === String(payload.bookingCode);
     });
-    if (!booking) throw new Error('Không tìm thấy booking.');
+    if (!booking) throw new Error('KhÃ´ng tÃ¬m tháº¥y booking.');
 
     var oldStatus = booking['Trang thai'];
     var oldSlotKey = slotKey_(
@@ -333,7 +339,7 @@ function setSlotStatusByKey_(slotSheet, key, newStatus, enforceEmptyBeforeBook) 
 
   if (!row) throw new Error('Slot key not found: ' + key);
   if (enforceEmptyBeforeBook && row['Trang thai'] !== CONFIG.STATUS.SLOT_EMPTY) {
-    throw new Error('Slot không hợp lệ.');
+    throw new Error('Slot khÃ´ng há»£p lá»‡.');
   }
 
   slotSheet.getRange(row._rowIndex, 4).setValue(newStatus);
@@ -400,7 +406,7 @@ function getAdminPinHash_() {
 function requireAdminPinConfigured_() {
   var hash = getAdminPinHash_();
   if (!hash) {
-    throw new Error('Admin PIN chưa được cấu hình. Chạy setAdminPin("your-pin") trong Apps Script editor.');
+    throw new Error('Admin PIN chÆ°a Ä‘Æ°á»£c cáº¥u hÃ¬nh. Cháº¡y setAdminPin("your-pin") trong Apps Script editor.');
   }
 }
 
@@ -408,7 +414,7 @@ function setAdminPin(pin) {
   requireField_(pin, 'pin');
   var clean = String(pin).trim();
   if (clean.length < 6) {
-    throw new Error('PIN phải tối thiểu 6 ký tự.');
+    throw new Error('PIN pháº£i tá»‘i thiá»ƒu 6 kÃ½ tá»±.');
   }
   var hash = hashAdminPin_(clean);
   PropertiesService.getScriptProperties().setProperty(CONFIG.SECURITY.ADMIN_PIN_PROPERTY_KEY, hash);
@@ -449,7 +455,7 @@ function requireAdminSession_(token) {
   var cacheKey = 'admin_session_' + String(token);
   var session = CacheService.getScriptCache().get(cacheKey);
   if (!session) {
-    throw new Error('Phiên admin hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.');
+    throw new Error('PhiÃªn admin háº¿t háº¡n hoáº·c khÃ´ng há»£p lá»‡. Vui lÃ²ng Ä‘Äƒng nháº­p láº¡i.');
   }
 }
 function getAdminSnapshot(payload) {
@@ -513,7 +519,7 @@ function adminSetSlotStatus(payload) {
   requireField_(payload.newStatus, 'newStatus');
 
   if ([CONFIG.STATUS.SLOT_EMPTY, CONFIG.STATUS.SLOT_BLOCKED].indexOf(payload.newStatus) === -1) {
-    throw new Error('Admin chỉ có thể chuyển slot giữa Trống và Block khẩn cấp.');
+    throw new Error('Admin chá»‰ cÃ³ thá»ƒ chuyá»ƒn slot giá»¯a Trá»‘ng vÃ  Block kháº©n cáº¥p.');
   }
 
   var lock = LockService.getScriptLock();
@@ -531,7 +537,7 @@ function adminSetSlotStatus(payload) {
     if (!row) throw new Error('Slot not found.');
 
     if (row['Trang thai'] === CONFIG.STATUS.SLOT_BOOKED && payload.newStatus === CONFIG.STATUS.SLOT_BLOCKED) {
-      throw new Error('Không thể block slot đang Đa Book. Hãy xử lý booking trước.');
+      throw new Error('KhÃ´ng thá»ƒ block slot Ä‘ang Äa Book. HÃ£y xá»­ lÃ½ booking trÆ°á»›c.');
     }
 
     slotSheet.getRange(row._rowIndex, 4).setValue(payload.newStatus);
@@ -553,6 +559,8 @@ function installTriggers() {
     .everyMinutes(CONFIG.TIME_DRIVEN_MINUTES)
     .create();
 }
+
+
 
 
 
