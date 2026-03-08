@@ -91,16 +91,18 @@
     const allSlots = adminState.snapshot.slots || [];
 
     // Populate date filter dropdown (preserve current selection)
-    const currentDateVal = dateFilter.value;
+    const currentDateVal = dateFilter ? dateFilter.value : '';
     const dates = [...new Set(allSlots.map(s => s.date))].sort();
-    dateFilter.innerHTML = '<option value="">-- Tất cả ngày --</option>';
-    dates.forEach((d) => {
-      const opt = document.createElement('option');
-      opt.value = d;
-      opt.textContent = d;
-      if (currentDateVal === d) opt.selected = true;
-      dateFilter.appendChild(opt);
-    });
+    if (dateFilter) {
+      dateFilter.innerHTML = '<option value="">-- Tất cả ngày --</option>';
+      dates.forEach((d) => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = d;
+        if (currentDateVal === d) opt.selected = true;
+        dateFilter.appendChild(opt);
+      });
+    }
 
     // Filter slots by selected date
     const filtered = currentDateVal ? allSlots.filter(s => s.date === currentDateVal) : allSlots;
@@ -130,8 +132,8 @@
 
   function onAuthFailed(err) {
     const msg = (err && err.message) ? err.message : 'Phiên admin không hợp lệ.';
-    setAdminStatus(msg);
-    if (msg.includes('Phiên admin') || msg.includes('phien admin')) {
+    setAdminStatus('Lỗi: ' + msg);
+    if (msg.includes('Phiên admin') || msg.includes('phien admin') || msg.includes('hết hạn') || msg.includes('het han')) {
       sessionStorage.removeItem('tarot_admin_token');
       adminState.token = '';
       showDashboard(false);
@@ -144,10 +146,15 @@
     setAdminStatus('Đang tải dữ liệu...');
     google.script.run
       .withSuccessHandler((snapshot) => {
-        adminState.snapshot = snapshot;
-        renderBookings();
-        renderSlots();
-        setAdminStatus('Đã cập nhật dữ liệu.');
+        try {
+          adminState.snapshot = snapshot;
+          renderBookings();
+          renderSlots();
+          setAdminStatus('Đã cập nhật dữ liệu.');
+        } catch (renderErr) {
+          setAdminStatus('Lỗi hiển thị: ' + renderErr.message);
+          console.error('Render error:', renderErr);
+        }
       })
       .withFailureHandler(onAuthFailed)
       .getAdminSnapshot(withAdminToken());

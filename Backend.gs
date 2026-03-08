@@ -1,4 +1,4 @@
-﻿function doGet(e) {
+function doGet(e) {
   var page = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase() : 'booking';
   var templateName = page === 'admin' ? 'Admin' : 'Index';
   var title = page === 'admin' ? 'Tarot Booking Admin - MÃ¨o TiÃªn Tri' : 'Tarot Booking - MÃ¨o TiÃªn Tri';
@@ -377,7 +377,12 @@ function processPendingTimeouts() {
         normalizeTime_(booking['Gio ket thuc'])
       );
 
-      setSlotStatusByKey_(slotSheet, oldSlotKey, CONFIG.STATUS.SLOT_EMPTY);
+      try {
+        setSlotStatusByKey_(slotSheet, oldSlotKey, CONFIG.STATUS.SLOT_EMPTY);
+      } catch (slotErr) {
+        Logger.log('Warning: could not release slot ' + oldSlotKey + ' - ' + slotErr.message);
+      }
+
       bookingSheet.getRange(booking._rowIndex, HEADERS.BOOKINGS.indexOf('Trang thai') + 1)
         .setValue(CONFIG.STATUS.BOOKING_CANCELLED);
       bookingSheet.getRange(booking._rowIndex, HEADERS.BOOKINGS.indexOf('Updated at') + 1)
