@@ -269,7 +269,7 @@
           <p><strong>Combo:</strong> ${res.comboName}</p>
           <p><strong>Lịch:</strong> ${res.slot.date} ${res.slot.start} - ${res.slot.end}</p>
         `;
-        document.getElementById('transfer-note').textContent = `${res.bookingCode} ${payload.phone}`;
+        document.getElementById('transfer-note').textContent = `${payload.socialName} ${payload.phone}`;
         startCountdown(res.paymentDeadlineIso);
         setStatus('Đã tạo đơn pending. Vui lòng thanh toán và upload biên lai.');
 

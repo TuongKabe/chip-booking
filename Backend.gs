@@ -83,6 +83,7 @@ function createPendingBooking(payload) {
   requireField_(payload.fullName, 'fullName');
   requireField_(payload.phone, 'phone');
   requireField_(payload.email, 'email');
+  requireField_(payload.socialName, 'socialName');
   requireField_(payload.comboId, 'comboId');
   requireField_(payload.slotKey, 'slotKey');
 
@@ -186,8 +187,10 @@ function uploadBillImage(payload) {
     });
     if (!booking) throw new Error('Booking not found.');
 
-    if (booking['Trang thai'] !== CONFIG.STATUS.BOOKING_PENDING) {
-      throw new Error('Chỉ cho phép upload bill khi booking đang Pending.');
+    var currentStatus = String(booking['Trang thai'] || '').trim().toLowerCase();
+    var expectedStatus = String(CONFIG.STATUS.BOOKING_PENDING).trim().toLowerCase();
+    if (currentStatus !== expectedStatus) {
+      throw new Error('Chỉ cho phép upload bill khi booking đang Pending. Trạng thái hiện tại: ' + booking['Trang thai']);
     }
 
     var deadline = booking['Han thanh toan'];

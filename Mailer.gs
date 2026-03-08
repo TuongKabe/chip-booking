@@ -1,7 +1,32 @@
+function formatDeadline_(value) {
+  var d = value instanceof Date ? value : new Date(value);
+  if (isNaN(d.getTime())) return String(value || '');
+  var tz = Session.getScriptTimeZone();
+  return Utilities.formatDate(d, tz, "HH:mm '—' dd/MM/yyyy");
+}
+
+function formatSlot_(bookingObj) {
+  var dateRaw = bookingObj['Ngay book'];
+  var startRaw = bookingObj['Gio bat dau'];
+  var endRaw = bookingObj['Gio ket thuc'];
+
+  var date = normalizeDate_(dateRaw);
+  var start = normalizeTime_(startRaw);
+  var end = normalizeTime_(endRaw);
+
+  // Format date to dd/MM/yyyy for readability
+  var parts = date.split('-'); // yyyy-MM-dd
+  var dateFormatted = (parts.length === 3) ? (parts[2] + '/' + parts[1] + '/' + parts[0]) : date;
+
+  return start + ' – ' + end + ', ngày ' + dateFormatted;
+}
+
 function sendPendingEmail_(bookingObj) {
   if (!bookingObj || !bookingObj['Email']) return;
 
   var subject = '[Mèo Tiên Tri] Xác nhận đặt lịch - ' + bookingObj['Ma Booking'];
+  var slotFormatted = formatSlot_(bookingObj);
+  var deadlineFormatted = formatDeadline_(bookingObj['Han thanh toan']);
 
   var html = [
     '<div style="font-family:Segoe UI,Arial,sans-serif;max-width:600px;margin:0 auto;color:#23201a;">',
@@ -17,13 +42,13 @@ function sendPendingEmail_(bookingObj) {
               '<td style="padding:8px 12px;border:1px solid #d8d1bf;">' + bookingObj['Ma Booking'] + '</td></tr>',
           '<tr><td style="padding:8px 12px;background:#f3efe2;font-weight:600;border:1px solid #d8d1bf;">Combo</td>',
               '<td style="padding:8px 12px;border:1px solid #d8d1bf;">' + bookingObj['Ten Combo'] + '</td></tr>',
-          '<tr><td style="padding:8px 12px;background:#f3efe2;font-weight:600;border:1px solid #d8d1bf;">Khung giờ</td>',
-              '<td style="padding:8px 12px;border:1px solid #d8d1bf;">' + bookingObj['Ngay book'] + ' | ' + bookingObj['Gio bat dau'] + ' - ' + bookingObj['Gio ket thuc'] + '</td></tr>',
-          '<tr><td style="padding:8px 12px;background:#f3efe2;font-weight:600;border:1px solid #d8d1bf;">Hạn thanh toán</td>',
-              '<td style="padding:8px 12px;border:1px solid #d8d1bf;color:#c0392b;font-weight:600;">' + bookingObj['Han thanh toan'] + '</td></tr>',
+          '<tr><td style="padding:8px 12px;background:#f3efe2;font-weight:600;border:1px solid #d8d1bf;">📅 Khung giờ</td>',
+              '<td style="padding:8px 12px;border:1px solid #d8d1bf;font-weight:600;">' + slotFormatted + '</td></tr>',
+          '<tr><td style="padding:8px 12px;background:#f3efe2;font-weight:600;border:1px solid #d8d1bf;">⏰ Hạn thanh toán</td>',
+              '<td style="padding:8px 12px;border:1px solid #d8d1bf;color:#c0392b;font-weight:600;font-size:16px;">' + deadlineFormatted + '</td></tr>',
         '</table>',
         '<div style="background:#eaf7f4;border-left:4px solid #136f63;padding:12px 16px;border-radius:4px;margin:16px 0;">',
-          '<strong>📌 Lưu ý:</strong> Nội dung chuyển khoản bắt buộc ghi: <strong>' + bookingObj['Ma Booking'] + '</strong>',
+          '<strong>📌 Lưu ý:</strong> Nội dung chuyển khoản bắt buộc ghi: <strong>' + bookingObj['Insta/Facebook'] + ' ' + bookingObj['Zalo/SDT'] + '</strong>',
         '</div>',
         '<p style="color:#6a6659;font-size:13px;">Nếu cần hỗ trợ, vui lòng liên hệ qua Zalo/SĐT hoặc inbox Instagram/Facebook của Chip nhé!</p>',
       '</div>',
@@ -38,6 +63,7 @@ function sendStatusChangedEmail_(bookingObj, oldStatus, note) {
 
   var newStatus = bookingObj['Trang thai'];
   var subject = '[Mèo Tiên Tri] Cập nhật đơn ' + bookingObj['Ma Booking'] + ' → ' + newStatus;
+  var slotFormatted = formatSlot_(bookingObj);
 
   var statusColor = '#136f63';
   var statusIcon = '📋';
@@ -66,8 +92,8 @@ function sendStatusChangedEmail_(bookingObj, oldStatus, note) {
         '<table style="width:100%;border-collapse:collapse;margin:16px 0;">',
           '<tr><td style="padding:8px 12px;background:#f3efe2;font-weight:600;width:140px;border:1px solid #d8d1bf;">Mã booking</td>',
               '<td style="padding:8px 12px;border:1px solid #d8d1bf;">' + bookingObj['Ma Booking'] + '</td></tr>',
-          '<tr><td style="padding:8px 12px;background:#f3efe2;font-weight:600;border:1px solid #d8d1bf;">Khung giờ</td>',
-              '<td style="padding:8px 12px;border:1px solid #d8d1bf;">' + bookingObj['Ngay book'] + ' | ' + bookingObj['Gio bat dau'] + ' - ' + bookingObj['Gio ket thuc'] + '</td></tr>',
+          '<tr><td style="padding:8px 12px;background:#f3efe2;font-weight:600;border:1px solid #d8d1bf;">📅 Khung giờ</td>',
+              '<td style="padding:8px 12px;border:1px solid #d8d1bf;font-weight:600;">' + slotFormatted + '</td></tr>',
         '</table>',
         noteHtml,
         '<p style="color:#6a6659;font-size:13px;">Nếu cần hỗ trợ, vui lòng liên hệ qua Zalo/SĐT hoặc inbox Instagram/Facebook của Chip nhé!</p>',
