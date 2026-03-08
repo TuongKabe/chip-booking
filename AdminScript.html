@@ -147,6 +147,10 @@
     google.script.run
       .withSuccessHandler((snapshot) => {
         try {
+          if (!snapshot) {
+            setAdminStatus('Lỗi: Server trả về dữ liệu rỗng. Hãy kiểm tra Deploy đã là New version chưa.');
+            return;
+          }
           adminState.snapshot = snapshot;
           renderBookings();
           renderSlots();
