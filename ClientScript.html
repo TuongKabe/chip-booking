@@ -1,7 +1,9 @@
-﻿<script>
+<script>
   const state = {
     selectedService: null,
     selectedSlot: null,
+    selectedCategory: '',
+    selectedDate: '',
     services: [],
     slots: [],
     booking: null,
@@ -18,16 +20,37 @@
     return new Intl.NumberFormat('vi-VN').format(n) + ' VND';
   }
 
+  /* ===== COMBO: category dropdown + filtered cards ===== */
+
+  function renderCategories() {
+    const select = document.getElementById('category-select');
+    const categories = [...new Set(state.services.map(s => s.category).filter(Boolean))];
+    select.innerHTML = '<option value="">-- Chọn phân loại --</option>';
+    categories.forEach((cat) => {
+      const opt = document.createElement('option');
+      opt.value = cat;
+      opt.textContent = cat;
+      if (state.selectedCategory === cat) opt.selected = true;
+      select.appendChild(opt);
+    });
+  }
+
   function renderServices() {
     const wrap = document.getElementById('service-list');
     wrap.innerHTML = '';
 
-    state.services.forEach((s) => {
+    if (!state.selectedCategory) {
+      wrap.innerHTML = '<p class="muted">Vui lòng chọn phân loại trước.</p>';
+      return;
+    }
+
+    const filtered = state.services.filter(s => s.category === state.selectedCategory);
+
+    filtered.forEach((s) => {
       const el = document.createElement('article');
       el.className = 'item' + (state.selectedService?.comboId === s.comboId ? ' selected' : '');
       el.innerHTML = `
         <strong>${s.name}</strong>
-        <p class="muted">${s.category || ''}</p>
         <p>${asCurrencyVnd(s.priceVnd)}${s.priceUsd ? ` (~${s.priceUsd} USD)` : ''}</p>
         <p class="muted">${(s.details || '').replace(/\n/g, '<br>')}</p>
       `;
@@ -37,59 +60,116 @@
       };
       wrap.appendChild(el);
     });
-  }
 
-  function renderSlots() {
-    const wrap = document.getElementById('slot-list');
-    wrap.innerHTML = '';
-
-    state.slots.forEach((s) => {
-      const el = document.createElement('article');
-      el.className = 'item' + (state.selectedSlot?.slotKey === s.slotKey ? ' selected' : '');
-      el.innerHTML = `<strong>${s.date}</strong><p>${s.start} - ${s.end}</p>`;
-      el.onclick = () => {
-        state.selectedSlot = s;
-        renderSlots();
-      };
-      wrap.appendChild(el);
-    });
-
-    if (!state.slots.length) {
-      wrap.innerHTML = '<p class="muted">Hiá»‡n chÆ°a cÃ³ khung giá» trá»‘ng.</p>';
+    if (!filtered.length) {
+      wrap.innerHTML = '<p class="muted">Không có combo nào trong phân loại này.</p>';
     }
   }
 
-  function loadInitialData() {
-    setStatus('Äang táº£i dá»¯ liá»‡u...');
+  document.getElementById('category-select').addEventListener('change', (e) => {
+    state.selectedCategory = e.target.value;
+    state.selectedService = null;
+    renderServices();
+  });
 
-    google.script.run
-      .withSuccessHandler((cfg) => {
-        state.config = cfg;
-        document.getElementById('qr-image').src = cfg.bank.qrImageUrl;
-        document.getElementById('bank-name').textContent = cfg.bank.bankName;
-        document.getElementById('bank-number').textContent = cfg.bank.accountNumber;
-        document.getElementById('bank-owner').textContent = cfg.bank.accountName;
-      })
-      .withFailureHandler((err) => {
-        setStatus('Khong tai duoc cau hinh he thong: ' + err.message);
-      })
-      .getPublicConfig();
+  /* ===== SLOTS: date dropdown + time dropdown ===== */
+
+  function renderDates() {
+    const select = document.getElementById('date-select');
+    const dates = [...new Set(state.slots.map(s => s.date))].sort();
+    select.innerHTML = '<option value="">-- Chọn ngày --</option>';
+    dates.forEach((d) => {
+      const opt = document.createElement('option');
+      opt.value = d;
+      opt.textContent = d;
+      if (state.selectedDate === d) opt.selected = true;
+      select.appendChild(opt);
+    });
+  }
+
+  function renderTimeSlots() {
+    const select = document.getElementById('time-select');
+    const info = document.getElementById('slot-info');
+
+    if (!state.selectedDate) {
+      select.innerHTML = '<option value="">-- Chọn ngày trước --</option>';
+      select.disabled = true;
+      info.textContent = '';
+      return;
+    }
+
+    select.disabled = false;
+    select.innerHTML = '<option value="">-- Chọn giờ --</option>';
+
+    const filtered = state.slots.filter(s => s.date === state.selectedDate);
+    filtered.forEach((s) => {
+      const opt = document.createElement('option');
+      opt.value = s.slotKey;
+      opt.textContent = s.start + ' - ' + s.end;
+      if (state.selectedSlot?.slotKey === s.slotKey) opt.selected = true;
+      select.appendChild(opt);
+    });
+
+    if (!filtered.length) {
+      select.innerHTML = '<option value="">Không có giờ trống</option>';
+    }
+
+    if (state.selectedSlot) {
+      info.textContent = '✓ Đã chọn: ' + state.selectedSlot.date + ' | ' + state.selectedSlot.start + ' - ' + state.selectedSlot.end;
+    } else {
+      info.textContent = '';
+    }
+  }
+
+  document.getElementById('date-select').addEventListener('change', (e) => {
+    state.selectedDate = e.target.value;
+    state.selectedSlot = null;
+    renderTimeSlots();
+  });
+
+  document.getElementById('time-select').addEventListener('change', (e) => {
+    const key = e.target.value;
+    state.selectedSlot = state.slots.find(s => s.slotKey === key) || null;
+    const info = document.getElementById('slot-info');
+    if (state.selectedSlot) {
+      info.textContent = '✓ Đã chọn: ' + state.selectedSlot.date + ' | ' + state.selectedSlot.start + ' - ' + state.selectedSlot.end;
+    } else {
+      info.textContent = '';
+    }
+  });
+
+  /* ===== LOAD DATA ===== */
+
+  function loadInitialData() {
+    setStatus('Đang tải dữ liệu...');
+
+    google.script.run.withSuccessHandler((cfg) => {
+      state.config = cfg;
+      document.getElementById('qr-image').src = cfg.bank.qrImageUrl;
+      document.getElementById('bank-name').textContent = cfg.bank.bankName;
+      document.getElementById('bank-number').textContent = cfg.bank.accountNumber;
+      document.getElementById('bank-owner').textContent = cfg.bank.accountName;
+    }).getPublicConfig();
 
     google.script.run.withSuccessHandler((services) => {
       state.services = services;
+      renderCategories();
       renderServices();
       setStatus('');
     }).withFailureHandler((err) => {
-      setStatus('KhÃ´ng táº£i Ä‘Æ°á»£c dá»‹ch vá»¥: ' + err.message);
+      setStatus('Không tải được dịch vụ: ' + err.message);
     }).getServices();
 
     google.script.run.withSuccessHandler((slots) => {
       state.slots = slots;
-      renderSlots();
+      renderDates();
+      renderTimeSlots();
     }).withFailureHandler((err) => {
-      setStatus('KhÃ´ng táº£i Ä‘Æ°á»£c khung giá»: ' + err.message);
+      setStatus('Không tải được khung giờ: ' + err.message);
     }).getAvailableSlots();
   }
+
+  /* ===== COUNTDOWN ===== */
 
   function startCountdown(deadlineIso) {
     if (state.timerId) clearInterval(state.timerId);
@@ -102,7 +182,7 @@
       if (diff <= 0) {
         node.textContent = '00:00';
         clearInterval(state.timerId);
-        setStatus('ÄÃ£ háº¿t háº¡n thanh toÃ¡n. Há»‡ thá»‘ng sáº½ huá»· Ä‘Æ¡n náº¿u chÆ°a xÃ¡c nháº­n.');
+        setStatus('Đã hết hạn thanh toán. Hệ thống sẽ huỷ đơn nếu chưa xác nhận.');
         return;
       }
       const min = Math.floor(diff / 60000);
@@ -113,6 +193,8 @@
     tick();
     state.timerId = setInterval(tick, 1000);
   }
+
+  /* ===== FILE HELPERS ===== */
 
   async function fileToBase64(file) {
     return new Promise((resolve, reject) => {
@@ -129,7 +211,7 @@
 
   function validateBillFile(file) {
     if (!state.config || !state.config.upload) {
-      return 'Há»‡ thá»‘ng chÆ°a táº£i xong cáº¥u hÃ¬nh upload. Vui lÃ²ng thá»­ láº¡i.';
+      return 'Hệ thống chưa tải xong cấu hình upload. Vui lòng thử lại.';
     }
 
     const allowed = (state.config.upload.allowedBillMimeTypes || []).map(v => String(v).toLowerCase());
@@ -137,28 +219,30 @@
     const mime = String(file.type || '').toLowerCase();
 
     if (!mime || !allowed.includes(mime)) {
-      return 'Äá»‹nh dáº¡ng áº£nh khÃ´ng há»£p lá»‡. Cho phÃ©p: ' + allowed.join(', ');
+      return 'Định dạng ảnh không hợp lệ. Cho phép: ' + allowed.join(', ');
     }
 
     if (maxMb > 0) {
       const maxBytes = maxMb * 1024 * 1024;
       if (file.size > maxBytes) {
-        return `File quÃ¡ lá»›n. Giá»›i háº¡n ${maxMb}MB.`;
+        return `File quá lớn. Giới hạn ${maxMb}MB.`;
       }
     }
 
     return '';
   }
 
+  /* ===== BOOKING FORM ===== */
+
   document.getElementById('booking-form').addEventListener('submit', (e) => {
     e.preventDefault();
 
     if (!state.selectedService) {
-      setStatus('Báº¡n chÆ°a chá»n combo.');
+      setStatus('Bạn chưa chọn combo.');
       return;
     }
     if (!state.selectedSlot) {
-      setStatus('Báº¡n chÆ°a chá»n khung giá».');
+      setStatus('Bạn chưa chọn khung giờ.');
       return;
     }
 
@@ -173,42 +257,45 @@
       slotKey: state.selectedSlot.slotKey
     };
 
-    setStatus('Äang táº¡o booking...');
+    setStatus('Đang tạo booking...');
 
     google.script.run
       .withSuccessHandler((res) => {
         state.booking = res;
         document.getElementById('step-payment').classList.remove('hidden');
         document.getElementById('booking-summary').innerHTML = `
-          <p><strong>MÃ£ booking:</strong> ${res.bookingCode}</p>
+          <p><strong>Mã booking:</strong> ${res.bookingCode}</p>
           <p><strong>Combo:</strong> ${res.comboName}</p>
-          <p><strong>Lá»‹ch:</strong> ${res.slot.date} ${res.slot.start} - ${res.slot.end}</p>
+          <p><strong>Lịch:</strong> ${res.slot.date} ${res.slot.start} - ${res.slot.end}</p>
         `;
         document.getElementById('transfer-note').textContent = `${res.bookingCode} ${payload.phone}`;
         startCountdown(res.paymentDeadlineIso);
-        setStatus('ÄÃ£ táº¡o Ä‘Æ¡n pending. Vui lÃ²ng thanh toÃ¡n vÃ  upload biÃªn lai.');
+        setStatus('Đã tạo đơn pending. Vui lòng thanh toán và upload biên lai.');
 
         google.script.run.withSuccessHandler((slots) => {
           state.slots = slots;
-          renderSlots();
+          renderDates();
+          renderTimeSlots();
         }).getAvailableSlots();
       })
       .withFailureHandler((err) => {
-        setStatus('Táº¡o booking tháº¥t báº¡i: ' + err.message);
+        setStatus('Tạo booking thất bại: ' + err.message);
       })
       .createPendingBooking(payload);
   });
 
+  /* ===== UPLOAD BILL ===== */
+
   document.getElementById('upload-btn').addEventListener('click', async () => {
     if (!state.booking) {
-      setStatus('Báº¡n chÆ°a táº¡o booking.');
+      setStatus('Bạn chưa tạo booking.');
       return;
     }
 
     const fileInput = document.getElementById('bill-file');
     const file = fileInput.files[0];
     if (!file) {
-      setStatus('Vui lÃ²ng chá»n áº£nh biÃªn lai.');
+      setStatus('Vui lòng chọn ảnh biên lai.');
       return;
     }
 
@@ -218,16 +305,16 @@
       return;
     }
 
-    setStatus('Äang táº£i biÃªn lai...');
+    setStatus('Đang tải biên lai...');
 
     const base64 = await fileToBase64(file);
     google.script.run
       .withSuccessHandler((res) => {
-        document.getElementById('upload-result').textContent = 'ÄÃ£ táº£i biÃªn lai: ' + res.fileUrl;
-        setStatus('Táº£i biÃªn lai thÃ nh cÃ´ng. Reader sáº½ xÃ¡c nháº­n thu tiá»n thá»§ cÃ´ng.');
+        document.getElementById('upload-result').textContent = 'Đã tải biên lai: ' + res.fileUrl;
+        setStatus('Tải biên lai thành công. Reader sẽ xác nhận thu tiền thủ công.');
       })
       .withFailureHandler((err) => {
-        setStatus('Upload tháº¥t báº¡i: ' + err.message);
+        setStatus('Upload thất bại: ' + err.message);
       })
       .uploadBillImage({
         bookingCode: state.booking.bookingCode,
@@ -239,4 +326,3 @@
 
   loadInitialData();
 </script>
-

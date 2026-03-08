@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tarot Booking Admin - Demo Preview</title>
+
+    <!-- ===== Styles ===== -->
+    <style>
+      :root {
+        --bg: #f6f6ea;
+        --text: #23201a;
+        --card: #fffef8;
+        --accent: #136f63;
+        --border: #d8d1bf;
+        --muted: #6a6659;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, sans-serif;
+        color: var(--text);
+        background: radial-gradient(circle at top left, #fff7d1 0%, var(--bg) 45%, #e8f4f1 100%);
+      }
+
+      .container {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 24px 16px 48px;
+      }
+
+      .hero { margin-bottom: 18px; }
+
+      .eyebrow {
+        text-transform: uppercase;
+        font-size: 12px;
+        letter-spacing: 1.2px;
+        color: var(--accent);
+        font-weight: 700;
+        margin: 0;
+      }
+
+      h1, h2 { margin: 8px 0 12px; }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 16px;
+        margin-top: 14px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 10px;
+      }
+
+      .item {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px;
+        cursor: pointer;
+        background: #fff;
+        transition: transform .12s ease, border-color .12s ease;
+      }
+
+      .item:hover {
+        transform: translateY(-2px);
+        border-color: var(--accent);
+      }
+
+      .item.selected {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(19, 111, 99, .12);
+      }
+
+      label {
+        display: block;
+        margin: 10px 0;
+        font-weight: 600;
+        font-size: 14px;
+      }
+
+      input, textarea, button {
+        width: 100%;
+        margin-top: 6px;
+        padding: 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font: inherit;
+      }
+
+      button {
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      button:hover { opacity: 0.9; }
+      button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+      .payment-grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      }
+
+      .qr {
+        width: 100%;
+        max-width: 280px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+      }
+
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .hidden { display: none; }
+
+      @media (max-width: 640px) {
+        .container { padding: 14px 10px 30px; }
+        .card { padding: 12px; }
+      }
+
+      /* Admin-specific */
+      .toolbar {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .toolbar button {
+        width: auto;
+        padding: 8px 12px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th, td {
+        border: 1px solid var(--border);
+        padding: 8px;
+        vertical-align: top;
+      }
+      th {
+        background: #f3efe2;
+        text-align: left;
+      }
+      .inline {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .inline select,
+      .inline input,
+      .inline button {
+        width: auto;
+        margin-top: 0;
+      }
+      .mini {
+        padding: 6px 8px;
+        font-size: 12px;
+      }
+      .scroll {
+        overflow-x: auto;
+      }
+      #dashboard.hidden,
+      #login-card.hidden { display: none; }
+
+      /* Demo banner */
+      .demo-banner {
+        background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);
+        color: #fff;
+        text-align: center;
+        padding: 10px;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="demo-banner">🔮 DEMO PREVIEW — Trang Admin xem trước, PIN demo: <strong>123456</strong></div>
+
+    <main class="container">
+      <header class="hero">
+        <p class="eyebrow">Tarot Booking</p>
+        <h1>Admin Dashboard</h1>
+        <p>Quản lý booking, block lịch đột xuất, xác nhận/huỷ/dời lịch.</p>
+      </header>
+
+      <section class="card" id="login-card">
+        <h2>Đăng nhập Admin</h2>
+        <label>PIN Admin
+          <input id="admin-pin" type="password" minlength="6" autocomplete="current-password" />
+        </label>
+        <button id="login-btn" type="button">Đăng nhập</button>
+        <p class="muted">Demo PIN: <strong>123456</strong></p>
+      </section>
+
+      <div id="dashboard" class="hidden">
+        <section class="card">
+          <div class="toolbar">
+            <button id="refresh-btn" type="button">Tải lại dữ liệu</button>
+            <button id="logout-btn" type="button">Đăng xuất</button>
+          </div>
+          <p class="muted" id="admin-status"></p>
+        </section>
+
+        <section class="card">
+          <h2>Đơn Booking</h2>
+          <div class="scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Mã</th>
+                  <th>Querent</th>
+                  <th>Combo</th>
+                  <th>Lịch</th>
+                  <th>Trạng thái</th>
+                  <th>Bill</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="booking-table"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Khung Giờ</h2>
+          <label>Lọc theo ngày
+            <select id="admin-date-filter">
+              <option value="">-- Tất cả ngày --</option>
+            </select>
+          </label>
+          <div class="scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ngày</th>
+                  <th>Khung giờ</th>
+                  <th>Trạng thái</th>
+                  <th>Block/Unblock</th>
+                </tr>
+              </thead>
+              <tbody id="slot-table"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- ===== Mock Data + Admin Script ===== -->
+    <script>
+      /* ---------- MOCK DATA ---------- */
+      const STATUS = {
+        SLOT_EMPTY: 'Trong',
+        SLOT_BOOKED: 'Da Book',
+        SLOT_BLOCKED: 'Block khan cap',
+        BOOKING_PENDING: 'Pending',
+        BOOKING_CONFIRMED: 'Confirmed',
+        BOOKING_CANCELLED: 'Cancelled',
+        BOOKING_RESCHEDULED: 'Rescheduled'
+      };
+
+      let MOCK_BOOKINGS = [
+        {
+          bookingCode: 'TRT-DEMO001',
+          fullName: 'Nguyễn Văn A',
+          phone: '0901234567',
+          email: 'nguyenvana@gmail.com',
+          comboName: 'Combo No.18',
+          status: STATUS.BOOKING_PENDING,
+          billUrl: '',
+          issueSummary: 'Muốn hỏi về sự nghiệp',
+          date: '2026-03-10',
+          start: '09:00',
+          end: '10:00',
+          slotKey: '2026-03-10_09:00_10:00'
+        },
+        {
+          bookingCode: 'TRT-DEMO002',
+          fullName: 'Trần Thị B',
+          phone: '0912345678',
+          email: 'tranthib@gmail.com',
+          comboName: 'Combo No.22',
+          status: STATUS.BOOKING_CONFIRMED,
+          billUrl: 'https://drive.google.com/demo-bill',
+          issueSummary: 'Hỏi về tình cảm',
+          date: '2026-03-10',
+          start: '14:00',
+          end: '15:00',
+          slotKey: '2026-03-10_14:00_15:00'
+        },
+        {
+          bookingCode: 'TRT-DEMO003',
+          fullName: 'Lê Hoàng C',
+          phone: '0923456789',
+          email: 'lehoangc@gmail.com',
+          comboName: 'Combo No.20',
+          status: STATUS.BOOKING_CANCELLED,
+          billUrl: '',
+          issueSummary: '',
+          date: '2026-03-11',
+          start: '09:00',
+          end: '10:00',
+          slotKey: '2026-03-11_09:00_10:00'
+        }
+      ];
+
+      let MOCK_SLOTS = [
+        { date: '2026-03-10', start: '09:00', end: '10:00', status: STATUS.SLOT_BOOKED, slotKey: '2026-03-10_09:00_10:00' },
+        { date: '2026-03-10', start: '10:30', end: '11:30', status: STATUS.SLOT_EMPTY, slotKey: '2026-03-10_10:30_11:30' },
+        { date: '2026-03-10', start: '14:00', end: '15:00', status: STATUS.SLOT_BOOKED, slotKey: '2026-03-10_14:00_15:00' },
+        { date: '2026-03-11', start: '09:00', end: '10:00', status: STATUS.SLOT_EMPTY, slotKey: '2026-03-11_09:00_10:00' },
+        { date: '2026-03-11', start: '15:00', end: '16:00', status: STATUS.SLOT_EMPTY, slotKey: '2026-03-11_15:00_16:00' },
+        { date: '2026-03-12', start: '10:00', end: '11:00', status: STATUS.SLOT_BLOCKED, slotKey: '2026-03-12_10:00_11:00' },
+        { date: '2026-03-12', start: '16:00', end: '17:00', status: STATUS.SLOT_EMPTY, slotKey: '2026-03-12_16:00_17:00' }
+      ];
+
+      /* ---------- Mock google.script.run ---------- */
+      window.google = {
+        script: {
+          run: new Proxy({}, {
+            get: function(target, prop) {
+              if (prop === 'withSuccessHandler') {
+                return function(handler) {
+                  return new Proxy({}, {
+                    get: function(t2, fn) {
+                      if (fn === 'withFailureHandler') {
+                        return function(errHandler) {
+                          return new Proxy({}, {
+                            get: function(t3, realFn) {
+                              return function(payload) { mockAdminCall(realFn, payload, handler, errHandler); };
+                            }
+                          });
+                        };
+                      }
+                      return function(payload) { mockAdminCall(fn, payload, handler, null); };
+                    }
+                  });
+                };
+              }
+              return function() {};
+            }
+          })
+        }
+      };
+
+      function mockAdminCall(fnName, payload, onSuccess, onFailure) {
+        setTimeout(function() {
+          switch (fnName) {
+            case 'adminLogin':
+              if (payload && payload.pin === '123456') {
+                onSuccess({ token: 'demo-token-' + Date.now(), expiresInSeconds: 28800 });
+              } else {
+                if (onFailure) onFailure({ message: 'Sai PIN admin.' });
+                else alert('Sai PIN admin.');
+              }
+              break;
+            case 'adminLogout':
+              if (onSuccess) onSuccess();
+              break;
+            case 'getAdminSnapshot':
+              onSuccess({
+                bookings: JSON.parse(JSON.stringify(MOCK_BOOKINGS)),
+                slots: JSON.parse(JSON.stringify(MOCK_SLOTS)),
+                status: STATUS
+              });
+              break;
+            case 'updateBookingStatus':
+              var b = MOCK_BOOKINGS.find(x => x.bookingCode === payload.bookingCode);
+              if (b) {
+                b.status = payload.newStatus;
+                if (payload.newStatus === STATUS.BOOKING_CANCELLED) {
+                  var s = MOCK_SLOTS.find(x => x.slotKey === b.slotKey);
+                  if (s) s.status = STATUS.SLOT_EMPTY;
+                }
+              }
+              if (onSuccess) onSuccess({ success: true });
+              break;
+            case 'adminSetSlotStatus':
+              var slot = MOCK_SLOTS.find(x => x.slotKey === payload.slotKey);
+              if (slot) slot.status = payload.newStatus;
+              if (onSuccess) onSuccess({ success: true });
+              break;
+            default:
+              if (onFailure) onFailure({ message: 'Mock: function not implemented' });
+          }
+        }, 300);
+      }
+
+      /* ---------- Original AdminScript.html ---------- */
+      const adminState = {
+        snapshot: null,
+        token: sessionStorage.getItem('tarot_admin_token') || ''
+      };
+
+      function setAdminStatus(msg) {
+        document.getElementById('admin-status').textContent = msg || '';
+      }
+
+      function esc(text) {
+        return String(text || '')
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#039;');
+      }
+
+      function showDashboard(isLoggedIn) {
+        document.getElementById('login-card').classList.toggle('hidden', isLoggedIn);
+        document.getElementById('dashboard').classList.toggle('hidden', !isLoggedIn);
+      }
+
+      function withAdminToken(payload) {
+        return Object.assign({}, payload || {}, { adminToken: adminState.token });
+      }
+
+      function buildRescheduleOptions(currentSlotKey) {
+        const slots = adminState.snapshot.slots || [];
+        return slots
+          .filter(s => s.status === adminState.snapshot.status.SLOT_EMPTY && s.slotKey !== currentSlotKey)
+          .map(s => `<option value="${esc(s.slotKey)}">${esc(s.date)} ${esc(s.start)}-${esc(s.end)}</option>`)
+          .join('');
+      }
+
+      function renderBookings() {
+        const tbody = document.getElementById('booking-table');
+        const rows = adminState.snapshot.bookings || [];
+
+        tbody.innerHTML = rows.map((b) => {
+          const rescheduleOptions = buildRescheduleOptions(b.slotKey);
+          const allowConfirm = b.status === adminState.snapshot.status.BOOKING_PENDING;
+          const allowCancel = [
+            adminState.snapshot.status.BOOKING_PENDING,
+            adminState.snapshot.status.BOOKING_CONFIRMED,
+            adminState.snapshot.status.BOOKING_RESCHEDULED
+          ].includes(b.status);
+          const allowReschedule = [
+            adminState.snapshot.status.BOOKING_PENDING,
+            adminState.snapshot.status.BOOKING_CONFIRMED,
+            adminState.snapshot.status.BOOKING_RESCHEDULED
+          ].includes(b.status);
+
+          return `
+            <tr>
+              <td>${esc(b.bookingCode)}</td>
+              <td>
+                <strong>${esc(b.fullName)}</strong><br>
+                <span class="muted">${esc(b.phone)}<br>${esc(b.email)}</span>
+              </td>
+              <td>${esc(b.comboName)}</td>
+              <td>${esc(b.date)}<br>${esc(b.start)}-${esc(b.end)}</td>
+              <td>${esc(b.status)}</td>
+              <td>${b.billUrl ? `<a href="${esc(b.billUrl)}" target="_blank">Xem bill</a>` : '<span class="muted">Chưa có</span>'}</td>
+              <td>
+                <div class="inline">
+                  <button class="mini" ${allowConfirm ? '' : 'disabled'} onclick="changeStatus('${esc(b.bookingCode)}','${esc(adminState.snapshot.status.BOOKING_CONFIRMED)}')">Confirm</button>
+                  <button class="mini" ${allowCancel ? '' : 'disabled'} onclick="changeStatus('${esc(b.bookingCode)}','${esc(adminState.snapshot.status.BOOKING_CANCELLED)}')">Cancel</button>
+                </div>
+                <div class="inline" style="margin-top:6px;">
+                  <select id="rs-${esc(b.bookingCode)}" ${allowReschedule ? '' : 'disabled'}>
+                    <option value="">Chọn slot mới</option>
+                    ${rescheduleOptions}
+                  </select>
+                  <button class="mini" ${allowReschedule ? '' : 'disabled'} onclick="rescheduleBooking('${esc(b.bookingCode)}')">Reschedule</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        if (!rows.length) {
+          tbody.innerHTML = '<tr><td colspan="7" class="muted">Chưa có booking.</td></tr>';
+        }
+      }
+
+      function renderSlots() {
+        const tbody = document.getElementById('slot-table');
+        const dateFilter = document.getElementById('admin-date-filter');
+        const allSlots = adminState.snapshot.slots || [];
+
+        // Populate date filter dropdown (preserve current selection)
+        const currentDateVal = dateFilter.value;
+        const dates = [...new Set(allSlots.map(s => s.date))].sort();
+        dateFilter.innerHTML = '<option value="">-- Tất cả ngày --</option>';
+        dates.forEach((d) => {
+          const opt = document.createElement('option');
+          opt.value = d;
+          opt.textContent = d;
+          if (currentDateVal === d) opt.selected = true;
+          dateFilter.appendChild(opt);
+        });
+
+        // Filter slots by selected date
+        const filtered = currentDateVal ? allSlots.filter(s => s.date === currentDateVal) : allSlots;
+
+        tbody.innerHTML = filtered.map((s) => {
+          const isBooked = s.status === adminState.snapshot.status.SLOT_BOOKED;
+          const willBlock = s.status !== adminState.snapshot.status.SLOT_BLOCKED;
+          const nextStatus = willBlock ? adminState.snapshot.status.SLOT_BLOCKED : adminState.snapshot.status.SLOT_EMPTY;
+          const label = willBlock ? 'Block' : 'Unblock';
+
+          return `
+            <tr>
+              <td>${esc(s.date)}</td>
+              <td>${esc(s.start)}-${esc(s.end)}</td>
+              <td>${esc(s.status)}</td>
+              <td>
+                <button class="mini" ${isBooked ? 'disabled' : ''} onclick="changeSlotStatus('${esc(s.slotKey)}','${esc(nextStatus)}')">${label}</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        if (!filtered.length) {
+          tbody.innerHTML = '<tr><td colspan="4" class="muted">Chưa có slot.</td></tr>';
+        }
+      }
+
+      function onAuthFailed(err) {
+        const msg = (err && err.message) ? err.message : 'Phiên admin không hợp lệ.';
+        setAdminStatus(msg);
+        if (msg.includes('Phiên admin') || msg.includes('phien admin')) {
+          sessionStorage.removeItem('tarot_admin_token');
+          adminState.token = '';
+          showDashboard(false);
+        }
+      }
+
+      function loadSnapshot() {
+        if (!adminState.token) return;
+
+        setAdminStatus('Đang tải dữ liệu...');
+        google.script.run
+          .withSuccessHandler((snapshot) => {
+            adminState.snapshot = snapshot;
+            renderBookings();
+            renderSlots();
+            setAdminStatus('Đã cập nhật dữ liệu.');
+          })
+          .withFailureHandler(onAuthFailed)
+          .getAdminSnapshot(withAdminToken());
+      }
+
+      function loginAdmin() {
+        const pin = document.getElementById('admin-pin').value || '';
+        if (pin.trim().length < 6) {
+          alert('PIN admin tối thiểu 6 ký tự.');
+          return;
+        }
+
+        google.script.run
+          .withSuccessHandler((res) => {
+            adminState.token = res.token;
+            sessionStorage.setItem('tarot_admin_token', res.token);
+            showDashboard(true);
+            document.getElementById('admin-pin').value = '';
+            loadSnapshot();
+          })
+          .withFailureHandler((err) => {
+            alert('Đăng nhập thất bại: ' + err.message);
+          })
+          .adminLogin({ pin });
+      }
+
+      function logoutAdmin() {
+        const token = adminState.token;
+        sessionStorage.removeItem('tarot_admin_token');
+        adminState.token = '';
+        adminState.snapshot = null;
+        showDashboard(false);
+        if (!token) return;
+
+        google.script.run
+          .withSuccessHandler(() => {})
+          .withFailureHandler(() => {})
+          .adminLogout({ adminToken: token });
+      }
+
+      function changeStatus(bookingCode, newStatus) {
+        const note = prompt('Ghi chú email (tuỳ chọn):', '') || '';
+        setAdminStatus('Đang cập nhật trạng thái booking...');
+
+        google.script.run
+          .withSuccessHandler(() => {
+            loadSnapshot();
+          })
+          .withFailureHandler(onAuthFailed)
+          .updateBookingStatus(withAdminToken({ bookingCode, newStatus, note }));
+      }
+
+      function rescheduleBooking(bookingCode) {
+        const select = document.getElementById('rs-' + bookingCode);
+        const newSlotKey = select ? select.value : '';
+        if (!newSlotKey) {
+          setAdminStatus('Vui lòng chọn slot mới trước khi dời lịch.');
+          return;
+        }
+
+        const note = prompt('Ghi chú dời lịch gửi email (tuỳ chọn):', '') || '';
+        setAdminStatus('Đang dời lịch...');
+
+        google.script.run
+          .withSuccessHandler(() => {
+            loadSnapshot();
+          })
+          .withFailureHandler(onAuthFailed)
+          .updateBookingStatus(withAdminToken({
+            bookingCode,
+            newStatus: adminState.snapshot.status.BOOKING_RESCHEDULED,
+            newSlotKey,
+            note
+          }));
+      }
+
+      function changeSlotStatus(slotKey, newStatus) {
+        setAdminStatus('Đang cập nhật slot...');
+        google.script.run
+          .withSuccessHandler(() => {
+            loadSnapshot();
+          })
+          .withFailureHandler(onAuthFailed)
+          .adminSetSlotStatus(withAdminToken({ slotKey, newStatus }));
+      }
+
+      document.getElementById('login-btn').addEventListener('click', loginAdmin);
+      document.getElementById('admin-pin').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') loginAdmin();
+      });
+      document.getElementById('refresh-btn').addEventListener('click', loadSnapshot);
+      document.getElementById('logout-btn').addEventListener('click', logoutAdmin);
+      document.getElementById('admin-date-filter').addEventListener('change', () => {
+        if (adminState.snapshot) renderSlots();
+      });
+
+      showDashboard(Boolean(adminState.token));
+      if (adminState.token) {
+        loadSnapshot();
+      }
+    </script>
+  </body>
+</html>

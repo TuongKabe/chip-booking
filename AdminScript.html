@@ -87,9 +87,25 @@
 
   function renderSlots() {
     const tbody = document.getElementById('slot-table');
-    const slots = adminState.snapshot.slots || [];
+    const dateFilter = document.getElementById('admin-date-filter');
+    const allSlots = adminState.snapshot.slots || [];
 
-    tbody.innerHTML = slots.map((s) => {
+    // Populate date filter dropdown (preserve current selection)
+    const currentDateVal = dateFilter.value;
+    const dates = [...new Set(allSlots.map(s => s.date))].sort();
+    dateFilter.innerHTML = '<option value="">-- Tất cả ngày --</option>';
+    dates.forEach((d) => {
+      const opt = document.createElement('option');
+      opt.value = d;
+      opt.textContent = d;
+      if (currentDateVal === d) opt.selected = true;
+      dateFilter.appendChild(opt);
+    });
+
+    // Filter slots by selected date
+    const filtered = currentDateVal ? allSlots.filter(s => s.date === currentDateVal) : allSlots;
+
+    tbody.innerHTML = filtered.map((s) => {
       const isBooked = s.status === adminState.snapshot.status.SLOT_BOOKED;
       const willBlock = s.status !== adminState.snapshot.status.SLOT_BLOCKED;
       const nextStatus = willBlock ? adminState.snapshot.status.SLOT_BLOCKED : adminState.snapshot.status.SLOT_EMPTY;
@@ -107,7 +123,7 @@
       `;
     }).join('');
 
-    if (!slots.length) {
+    if (!filtered.length) {
       tbody.innerHTML = '<tr><td colspan="4" class="muted">Chưa có slot.</td></tr>';
     }
   }
@@ -221,6 +237,9 @@
   document.getElementById('login-btn').addEventListener('click', loginAdmin);
   document.getElementById('refresh-btn').addEventListener('click', loadSnapshot);
   document.getElementById('logout-btn').addEventListener('click', logoutAdmin);
+  document.getElementById('admin-date-filter').addEventListener('change', () => {
+    if (adminState.snapshot) renderSlots();
+  });
 
   showDashboard(Boolean(adminState.token));
   if (adminState.token) {

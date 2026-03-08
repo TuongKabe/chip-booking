@@ -17,12 +17,27 @@
 
       <section class="card" id="step-services">
         <h2>Bước 1: Chọn Combo</h2>
+        <label>Phân loại
+          <select id="category-select">
+            <option value="">-- Chọn phân loại --</option>
+          </select>
+        </label>
         <div id="service-list" class="grid"></div>
       </section>
 
       <section class="card" id="step-slots">
         <h2>Bước 2: Chọn Khung Giờ</h2>
-        <div id="slot-list" class="grid"></div>
+        <label>Chọn ngày
+          <select id="date-select">
+            <option value="">-- Chọn ngày --</option>
+          </select>
+        </label>
+        <label>Chọn giờ
+          <select id="time-select" disabled>
+            <option value="">-- Chọn ngày trước --</option>
+          </select>
+        </label>
+        <p id="slot-info" class="muted"></p>
       </section>
 
       <section class="card" id="step-form">
