@@ -58,22 +58,34 @@
 
     tbody.innerHTML = rows.map((b) => {
       const rescheduleOptions = buildRescheduleOptions(b.slotKey);
-      const isConfirmed = b.status === adminState.snapshot.status.BOOKING_CONFIRMED;
-      const isCancelled = b.status === adminState.snapshot.status.BOOKING_CANCELLED;
-      const allowConfirm = b.status === adminState.snapshot.status.BOOKING_PENDING;
-      const allowCancel = [
-        adminState.snapshot.status.BOOKING_PENDING,
-        adminState.snapshot.status.BOOKING_CONFIRMED,
-        adminState.snapshot.status.BOOKING_RESCHEDULED
-      ].includes(b.status);
-      const allowReschedule = [
-        adminState.snapshot.status.BOOKING_PENDING,
-        adminState.snapshot.status.BOOKING_CONFIRMED,
-        adminState.snapshot.status.BOOKING_RESCHEDULED
-      ].includes(b.status);
+      const st = adminState.snapshot.status;
+      const isConfirmed = b.status === st.BOOKING_CONFIRMED;
+      const isCancelled = b.status === st.BOOKING_CANCELLED;
+      const isRescheduled = b.status === st.BOOKING_RESCHEDULED;
+      const isPending = b.status === st.BOOKING_PENDING;
 
-      const confirmBtnStyle = isConfirmed ? 'background:#28a745;color:#fff;' : isCancelled ? 'background:#ccc;' : '';
-      const confirmBtnText = isConfirmed ? '✓ Đã xác nhận' : isCancelled ? 'Đã huỷ' : 'Confirm';
+      // Confirm: chỉ bấm được khi Pending
+      const allowConfirm = isPending;
+      // Cancel: bấm được khi Pending, Confirmed, Rescheduled
+      const allowCancel = !isCancelled;
+      // Reschedule: bấm được khi Pending, Confirmed, Rescheduled
+      const allowReschedule = !isCancelled;
+
+      // Confirm button styling
+      let confirmBtnStyle = '';
+      let confirmBtnText = 'Confirm';
+      if (isConfirmed) { confirmBtnStyle = 'background:#28a745;color:#fff;'; confirmBtnText = '✓ Đã xác nhận'; }
+      else if (isCancelled) { confirmBtnStyle = 'background:#ccc;'; confirmBtnText = '—'; }
+      else if (isRescheduled) { confirmBtnStyle = 'background:#e67e22;color:#fff;'; confirmBtnText = '↻ Đã dời'; }
+
+      // Cancel button styling
+      let cancelBtnStyle = '';
+      let cancelBtnText = 'Cancel';
+      if (isCancelled) { cancelBtnStyle = 'background:#c0392b;color:#fff;'; cancelBtnText = '✗ Đã huỷ'; }
+
+      // Reschedule button styling
+      let rescheduleBtnText = 'Reschedule';
+      if (isRescheduled) { rescheduleBtnText = '✓ Đã dời'; }
 
       return `
         <tr>
@@ -88,15 +100,15 @@
           <td>${b.billUrl ? `<a href="${esc(b.billUrl)}" target="_blank">Xem bill</a>` : '<span class="muted">Chưa có</span>'}</td>
           <td>
             <div class="inline">
-              <button class="mini" style="${confirmBtnStyle}" ${allowConfirm ? '' : 'disabled'} onclick="changeStatus('${esc(b.bookingCode)}','${esc(adminState.snapshot.status.BOOKING_CONFIRMED)}')">${confirmBtnText}</button>
-              <button class="mini" ${allowCancel ? '' : 'disabled'} onclick="changeStatus('${esc(b.bookingCode)}','${esc(adminState.snapshot.status.BOOKING_CANCELLED)}')">${isCancelled ? '✗ Đã huỷ' : 'Cancel'}</button>
+              <button class="mini" style="${confirmBtnStyle}" ${allowConfirm ? '' : 'disabled'} onclick="changeStatus('${esc(b.bookingCode)}','${esc(st.BOOKING_CONFIRMED)}')">${confirmBtnText}</button>
+              <button class="mini" style="${cancelBtnStyle}" ${allowCancel ? '' : 'disabled'} onclick="changeStatus('${esc(b.bookingCode)}','${esc(st.BOOKING_CANCELLED)}')">${cancelBtnText}</button>
             </div>
             <div class="inline" style="margin-top:6px;">
               <select id="rs-${esc(b.bookingCode)}" ${allowReschedule ? '' : 'disabled'}>
                 <option value="">Chọn slot mới</option>
                 ${rescheduleOptions}
               </select>
-              <button class="mini" ${allowReschedule ? '' : 'disabled'} onclick="rescheduleBooking('${esc(b.bookingCode)}')">${b.status === adminState.snapshot.status.BOOKING_RESCHEDULED ? '✓ Đã dời' : 'Reschedule'}</button>
+              <button class="mini" ${allowReschedule ? '' : 'disabled'} onclick="rescheduleBooking('${esc(b.bookingCode)}')">${rescheduleBtnText}</button>
             </div>
           </td>
         </tr>
